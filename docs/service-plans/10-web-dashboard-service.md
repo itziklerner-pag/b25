@@ -9,14 +9,23 @@
 
 ## 1. Technology Stack Recommendation
 
-### Core Framework: **React 18+ with TypeScript**
+### Core Framework: **React 18+ with JavaScript (ES6+)**
+
+**IMPORTANT: JavaScript-Only Policy**
+
+This project enforces a **strict JavaScript-only policy**:
+- NO TypeScript allowed
+- All code must be written in pure JavaScript (ES6+)
+- Use JSDoc comments for type documentation
+- No `.ts` or `.tsx` files - use `.js` and `.jsx` only
 
 **Rationale:**
 - Industry-standard with extensive ecosystem
 - Excellent WebSocket integration libraries
-- Strong TypeScript support for type-safe data flow
+- JSDoc provides documentation without build complexity
 - Server Components support for future optimization
 - Large talent pool for maintenance
+- Simpler debugging and runtime behavior
 
 **Alternative Consideration:** SolidJS (best performance) or Svelte (simplest DX)
 
@@ -26,8 +35,9 @@
 - Lightning-fast HMR for development experience
 - Optimized production builds with Rollup
 - Native ESM support
-- Built-in TypeScript support
+- Excellent JavaScript (ES6+) support
 - Minimal configuration
+- No TypeScript compilation needed
 
 ### UI Framework: **Tailwind CSS + shadcn/ui**
 
@@ -111,7 +121,6 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.0",
     "vite": "^5.1.0",
-    "typescript": "^5.3.0",
     "vitest": "^1.3.0",
     "@testing-library/react": "^14.2.0",
     "@testing-library/user-event": "^14.5.0",
@@ -122,6 +131,8 @@
     "eslint": "^8.57.0",
     "prettier": "^3.2.0"
   }
+
+  NOTE: NO TypeScript - JavaScript (ES6+) only!
 }
 ```
 
@@ -189,16 +200,17 @@ App (Root)
 
 ### WebSocket Integration Pattern
 
-```typescript
+```javascript
 // Custom hook pattern with auto-reconnect
-interface WebSocketHook {
-  data: TradingData;
-  status: 'connecting' | 'connected' | 'disconnected' | 'error';
-  latency: number;
-  reconnect: () => void;
-  subscribe: (channel: string) => void;
-  unsubscribe: (channel: string) => void;
-}
+/**
+ * @typedef {Object} WebSocketHook
+ * @property {TradingData} data
+ * @property {'connecting'|'connected'|'disconnected'|'error'} status
+ * @property {number} latency
+ * @property {Function} reconnect
+ * @property {Function} subscribe - Subscribe to a channel
+ * @property {Function} unsubscribe - Unsubscribe from a channel
+ */
 
 // Store pattern
 interface WebSocketStore {
@@ -337,7 +349,7 @@ const routes = [
 ### Phase 1: Project Setup and Layout (Week 1, Days 1-2)
 
 **Goals:**
-- Initialize Vite + React + TypeScript project
+- Initialize Vite + React + JavaScript project
 - Configure Tailwind CSS and shadcn/ui
 - Implement layout shell and routing
 - Setup development tooling
@@ -345,10 +357,12 @@ const routes = [
 **Tasks:**
 1. Project initialization
    ```bash
-   npm create vite@latest web-dashboard -- --template react-ts
+   npm create vite@latest web-dashboard -- --template react
    cd web-dashboard
    npm install
    ```
+
+   **IMPORTANT**: Use `react` template, NOT `react-ts`. JavaScript only!
 
 2. Install dependencies
    ```bash
@@ -380,9 +394,14 @@ const routes = [
 
 **Tasks:**
 1. Create `useWebSocket` hook
-   ```typescript
-   // src/hooks/useWebSocket.ts
-   export function useWebSocket(url: string) {
+   ```javascript
+   // src/hooks/useWebSocket.js
+   /**
+    * Custom WebSocket hook with auto-reconnection
+    * @param {string} url - WebSocket URL
+    * @returns {Object} WebSocket connection state and methods
+    */
+   export function useWebSocket(url) {
      const [status, setStatus] = useState<ConnectionStatus>('disconnected');
      const wsRef = useRef<WebSocket | null>(null);
 
@@ -414,8 +433,8 @@ const routes = [
    ```
 
 2. Create Zustand store
-   ```typescript
-   // src/store/trading.ts
+   ```javascript
+   // src/store/trading.js
    export const useTradingStore = create<TradingStore>((set, get) => ({
      orderbook: new Map(),
      positions: new Map(),
@@ -453,8 +472,8 @@ const routes = [
 
 **Tasks:**
 1. Create `AccountSummary` component
-   ```typescript
-   // src/components/AccountSummary.tsx
+   ```javascript
+   // src/components/AccountSummary.jsx
    export function AccountSummary() {
      const account = useTradingStore(state => state.account);
 
@@ -494,8 +513,8 @@ const routes = [
 
 **Tasks:**
 1. Create `PositionsTable` component
-   ```typescript
-   // src/components/PositionsTable.tsx
+   ```javascript
+   // src/components/PositionsTable.jsx
    export function PositionsTable() {
      const positions = useTradingStore(state =>
        Array.from(state.positions.values())
@@ -768,8 +787,8 @@ const routes = [
 
 ### WebSocket Hook Implementation
 
-```typescript
-// src/hooks/useWebSocket.ts
+```javascript
+// src/hooks/useWebSocket.js
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useTradingStore } from '../store/trading';
 
@@ -927,8 +946,8 @@ export function useWebSocket({
 
 ### State Management Structure
 
-```typescript
-// src/store/trading.ts
+```javascript
+// src/store/trading.js
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 
@@ -1073,8 +1092,8 @@ export const useTradingStore = create<TradingStore>()(
 
 #### Connection Status Indicator
 
-```typescript
-// src/components/ConnectionStatus.tsx
+```javascript
+// src/components/ConnectionStatus.jsx
 import { useMemo } from 'react';
 import { Wifi, WifiOff, AlertCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -2042,22 +2061,23 @@ test.describe('Performance', () => {
 {
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "vite build",
     "preview": "vite preview",
     "test": "vitest",
     "test:e2e": "playwright test",
     "test:coverage": "vitest --coverage",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
-    "type-check": "tsc --noEmit"
+    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
+    "format": "prettier --write \"src/**/*.{js,jsx,css}\""
   }
+
+  NOTE: No TypeScript compilation needed!
 }
 ```
 
 ### Production Build Configuration
 
-```typescript
-// vite.config.ts
+```javascript
+// vite.config.js
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { visualizer } from 'rollup-plugin-visualizer';
@@ -2214,16 +2234,18 @@ server {
 
 ### Environment Configuration
 
-```typescript
-// src/config/env.ts
-interface Config {
-  websocketUrl: string;
-  apiUrl: string;
-  environment: 'development' | 'production';
-  enableDevTools: boolean;
-}
+```javascript
+// src/config/env.js
+/**
+ * @typedef {Object} Config
+ * @property {string} websocketUrl
+ * @property {string} apiUrl
+ * @property {'development'|'production'} environment
+ * @property {boolean} enableDevTools
+ */
 
-export const config: Config = {
+/** @type {Config} */
+export const config = {
   websocketUrl: import.meta.env.VITE_WS_URL || 'ws://localhost:8080/ws',
   apiUrl: import.meta.env.VITE_API_URL || 'http://localhost:8080/api',
   environment: import.meta.env.MODE as 'development' | 'production',
@@ -2585,7 +2607,7 @@ useEffect(() => {
 
 This comprehensive development plan provides:
 
-1. **Modern Technology Stack**: React 18, Vite, TypeScript, Tailwind CSS, Zustand, TanStack Query
+1. **Modern Technology Stack**: React 18, Vite, JavaScript (ES6+), Tailwind CSS, Zustand, TanStack Query (NO TypeScript)
 2. **Scalable Architecture**: Component hierarchy, WebSocket integration, state management
 3. **Phased Development**: 9 phases over 4 weeks with clear deliverables
 4. **Production-Ready Implementation**: WebSocket hooks, chart components, trading forms
@@ -2607,10 +2629,11 @@ This comprehensive development plan provides:
 **Development Timeline:** 4 weeks (24 working days)
 
 **Next Steps:**
-1. Initialize project with Vite + React + TypeScript
+1. Initialize project with Vite + React + JavaScript (NO TypeScript!)
 2. Setup development environment and tooling
 3. Begin Phase 1: Project setup and layout
 4. Follow phased development plan sequentially
+5. Remember: All code must be in pure JavaScript (ES6+) with JSDoc for documentation
 
 ---
 

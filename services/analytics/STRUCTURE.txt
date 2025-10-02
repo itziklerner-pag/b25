@@ -1,0 +1,60 @@
+services/analytics/
+├── cmd/
+│   └── server/
+│       └── main.go                    # Application entry point
+├── internal/
+│   ├── aggregation/
+│   │   └── engine.go                  # Metrics aggregation engine
+│   ├── api/
+│   │   ├── handlers.go                # HTTP request handlers
+│   │   ├── handlers_test.go           # Handler unit tests
+│   │   └── router.go                  # HTTP routing & middleware
+│   ├── cache/
+│   │   └── redis.go                   # Redis caching layer
+│   ├── config/
+│   │   ├── config.go                  # Configuration management
+│   │   └── config_test.go             # Config unit tests
+│   ├── ingestion/
+│   │   └── consumer.go                # Kafka event consumer
+│   ├── logger/
+│   │   └── logger.go                  # Structured logging setup
+│   ├── metrics/
+│   │   └── prometheus.go              # Prometheus metrics
+│   ├── models/
+│   │   ├── event.go                   # Data models & types
+│   │   └── event_test.go              # Model unit tests
+│   └── repository/
+│       └── postgres.go                # PostgreSQL repository
+├── migrations/
+│   └── 001_initial_schema.sql         # Database schema & migrations
+├── scripts/
+│   ├── init-topics.sh                 # Kafka topic initialization
+│   └── test-event.sh                  # API testing script
+├── tests/
+│   └── integration_test.go            # Integration tests
+├── .air.toml                          # Hot reload configuration
+├── .dockerignore                      # Docker ignore patterns
+├── .gitignore                         # Git ignore patterns
+├── config.example.yaml                # Example configuration
+├── docker-compose.yml                 # Docker Compose stack
+├── Dockerfile                         # Container image definition
+├── go.mod                             # Go module dependencies
+├── go.sum                             # Go dependency checksums
+├── IMPLEMENTATION_SUMMARY.md          # Detailed implementation docs
+├── Makefile                           # Build automation tasks
+├── progress.md                        # Development progress tracker
+├── prometheus.yml                     # Prometheus configuration
+├── QUICK_START.md                     # Quick start guide
+├── README.md                          # Main documentation
+└── STRUCTURE.txt                      # This file
+
+Key Directories:
+- cmd/          : Application entry points
+- internal/     : Private application code
+- migrations/   : Database schema & migrations
+- scripts/      : Utility scripts
+- tests/        : Integration & E2E tests
+
+Total Files: 30+ source files
+Total Lines: 5,000+ lines of code
+Language: Go 1.21+

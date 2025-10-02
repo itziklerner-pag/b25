@@ -1,0 +1,121 @@
+# Analytics Service Configuration Example
+# Copy this to config.yaml and adjust values for your environment
+
+server:
+  host: "0.0.0.0"
+  port: 9097
+  read_timeout: 30s
+  write_timeout: 30s
+  shutdown_timeout: 10s
+
+database:
+  host: "localhost"
+  port: 5432
+  database: "analytics"
+  user: "analytics_user"
+  password: "your_secure_password_here"
+  ssl_mode: "disable"  # Use "require" in production
+  max_connections: 50
+  max_idle_connections: 10
+  connection_lifetime: 300s
+
+redis:
+  host: "localhost"
+  port: 6379
+  password: ""
+  db: 0
+  pool_size: 10
+  min_idle_conns: 5
+
+kafka:
+  brokers:
+    - "localhost:9092"
+  consumer_group: "analytics-consumer-group"
+  topics:
+    - "trading.events"
+    - "market.data"
+    - "order.events"
+    - "user.actions"
+  enable_auto_commit: false
+  session_timeout: 30s
+
+analytics:
+  # Event ingestion settings
+  ingestion:
+    batch_size: 1000
+    batch_timeout: 5s
+    workers: 4
+    buffer_size: 10000
+
+  # Aggregation settings
+  aggregation:
+    intervals:
+      - "1m"   # 1 minute
+      - "5m"   # 5 minutes
+      - "15m"  # 15 minutes
+      - "1h"   # 1 hour
+      - "1d"   # 1 day
+    workers: 2
+
+  # Data retention policies
+  retention:
+    raw_events: 90d        # Keep raw events for 90 days
+    minute_aggregates: 365d # Keep 1-minute aggregates for 1 year
+    hour_aggregates: 730d   # Keep hourly aggregates for 2 years
+    daily_aggregates: 3650d # Keep daily aggregates for 10 years
+
+  # Query optimization
+  query:
+    max_results: 10000
+    default_limit: 100
+    timeout: 30s
+    cache_ttl: 60s
+
+metrics:
+  enabled: true
+  port: 9098
+  path: "/metrics"
+
+logging:
+  level: "info"  # debug, info, warn, error
+  format: "json" # json or console
+  output: "stdout"
+  file_path: ""  # Optional: log to file
+
+health:
+  port: 9099
+  path: "/health"
+
+# Custom event definitions
+custom_events:
+  enabled: true
+  max_properties: 50
+  max_property_size: 1024  # bytes
+
+# Real-time analytics
+realtime:
+  enabled: true
+  websocket_port: 9100
+  max_connections: 1000
+  update_interval: 1s
+
+# Security
+security:
+  api_key_enabled: true
+  rate_limit:
+    enabled: true
+    requests_per_minute: 1000
+    burst: 100
+  cors:
+    enabled: true
+    allowed_origins:
+      - "http://localhost:3000"
+      - "http://localhost:8080"
+    allowed_methods:
+      - "GET"
+      - "POST"
+      - "PUT"
+      - "DELETE"
+    allowed_headers:
+      - "Content-Type"
+      - "Authorization"

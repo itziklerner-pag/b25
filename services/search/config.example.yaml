@@ -1,0 +1,149 @@
+# Search Service Configuration Example
+# Copy to config.yaml and update with your settings
+
+server:
+  host: "0.0.0.0"
+  port: 9097
+  read_timeout: 30s
+  write_timeout: 30s
+  shutdown_timeout: 10s
+
+elasticsearch:
+  addresses:
+    - "http://localhost:9200"
+  username: "elastic"
+  password: "changeme"
+  # API key authentication (alternative to username/password)
+  # api_key: "your-api-key"
+
+  # Connection settings
+  max_retries: 3
+  retry_backoff: 1s
+  enable_debug_logger: false
+
+  # Index settings
+  indices:
+    trades:
+      name: "b25-trades"
+      shards: 5
+      replicas: 1
+    orders:
+      name: "b25-orders"
+      shards: 5
+      replicas: 1
+    strategies:
+      name: "b25-strategies"
+      shards: 2
+      replicas: 1
+    market_data:
+      name: "b25-market-data"
+      shards: 10
+      replicas: 1
+    logs:
+      name: "b25-logs"
+      shards: 5
+      replicas: 1
+
+redis:
+  address: "localhost:6379"
+  password: ""
+  db: 0
+  pool_size: 10
+  # Cache TTLs
+  cache_ttl: 300s  # 5 minutes
+  analytics_ttl: 3600s  # 1 hour
+
+nats:
+  url: "nats://localhost:4222"
+  subjects:
+    trades: "trades.>"
+    orders: "orders.>"
+    strategies: "strategies.>"
+    market_data: "market.>"
+    logs: "logs.>"
+
+search:
+  # Search result limits
+  max_results: 10000
+  default_page_size: 50
+  max_page_size: 1000
+
+  # Search performance
+  timeout: 5s
+  min_score: 0.1
+
+  # Autocomplete settings
+  autocomplete:
+    min_chars: 2
+    max_suggestions: 10
+
+  # Facets
+  facets:
+    max_buckets: 100
+
+  # Highlighting
+  highlight:
+    enabled: true
+    pre_tag: "<em>"
+    post_tag: "</em>"
+    fragment_size: 150
+    number_of_fragments: 3
+
+indexer:
+  # Bulk indexing settings
+  batch_size: 1000
+  flush_interval: 5s
+  workers: 4
+
+  # Retry settings
+  max_retries: 3
+  retry_delay: 1s
+
+  # Queue settings
+  queue_buffer: 10000
+
+analytics:
+  enabled: true
+  # Track popular searches
+  track_searches: true
+  # Track click-through rates
+  track_clicks: true
+  # Retention period for analytics data
+  retention_days: 90
+
+logging:
+  level: "info"  # debug, info, warn, error
+  format: "json"  # json, console
+  output: "stdout"  # stdout, file
+  file_path: "/var/log/search-service.log"
+
+metrics:
+  enabled: true
+  port: 9098
+  path: "/metrics"
+
+health:
+  path: "/health"
+  readiness_path: "/ready"
+
+# Rate limiting
+rate_limit:
+  enabled: true
+  requests_per_second: 100
+  burst: 200
+
+# CORS settings
+cors:
+  enabled: true
+  allowed_origins:
+    - "http://localhost:3000"
+    - "http://localhost:8080"
+  allowed_methods:
+    - "GET"
+    - "POST"
+    - "PUT"
+    - "DELETE"
+  allowed_headers:
+    - "Content-Type"
+    - "Authorization"
+  max_age: 3600

@@ -1,0 +1,225 @@
+version: '3.8'
+
+# Development Docker Compose Configuration
+# Start all services: docker-compose -f docker/docker-compose.dev.yml up
+
+services:
+  # ============================================
+  # Infrastructure Services
+  # ============================================
+
+  redis:
+    image: redis:7-alpine
+    container_name: b25-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - b25-network
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: b25-postgres
+    environment:
+      POSTGRES_DB: b25_config
+      POSTGRES_USER: b25
+      POSTGRES_PASSWORD: dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U b25"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - b25-network
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: b25-timescaledb
+    environment:
+      POSTGRES_DB: b25_timeseries
+      POSTGRES_USER: b25
+      POSTGRES_PASSWORD: dev_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - timescaledb-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U b25"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - b25-network
+
+  nats:
+    image: nats:latest
+    container_name: b25-nats
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    command: ["-js", "-m", "8222"]
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8222/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - b25-network
+
+  # ============================================
+  # Observability Services
+  # ============================================
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: b25-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ../services/metrics/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+    networks:
+      - b25-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: b25-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ../services/metrics/grafana/provisioning:/etc/grafana/provisioning
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - b25-network
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: b25-alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ../services/metrics/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+    networks:
+      - b25-network
+
+  # ============================================
+  # Trading System Services (uncomment when ready)
+  # ============================================
+
+  # market-data:
+  #   build:
+  #     context: ../services/market-data
+  #     dockerfile: Dockerfile
+  #   container_name: b25-market-data
+  #   environment:
+  #     - RUST_LOG=info
+  #     - REDIS_URL=redis://redis:6379
+  #   ports:
+  #     - "9090:9090"
+  #   depends_on:
+  #     - redis
+  #   networks:
+  #     - b25-network
+
+  # order-execution:
+  #   build:
+  #     context: ../services/order-execution
+  #     dockerfile: Dockerfile
+  #   container_name: b25-order-execution
+  #   environment:
+  #     - REDIS_URL=redis://redis:6379
+  #     - NATS_URL=nats://nats:4222
+  #   ports:
+  #     - "9091:9091"
+  #   depends_on:
+  #     - redis
+  #     - nats
+  #   networks:
+  #     - b25-network
+
+  # strategy-engine:
+  #   build:
+  #     context: ../services/strategy-engine
+  #     dockerfile: Dockerfile
+  #   container_name: b25-strategy-engine
+  #   environment:
+  #     - NATS_URL=nats://nats:4222
+  #   ports:
+  #     - "9092:9092"
+  #   depends_on:
+  #     - nats
+  #   networks:
+  #     - b25-network
+
+  # account-monitor:
+  #   build:
+  #     context: ../services/account-monitor
+  #     dockerfile: Dockerfile
+  #   container_name: b25-account-monitor
+  #   environment:
+  #     - TIMESCALEDB_URL=postgres://b25:dev_password@timescaledb:5432/b25_timeseries
+  #     - REDIS_URL=redis://redis:6379
+  #   ports:
+  #     - "9093:9093"
+  #   depends_on:
+  #     - timescaledb
+  #     - redis
+  #   networks:
+  #     - b25-network
+
+  # dashboard-server:
+  #   build:
+  #     context: ../services/dashboard-server
+  #     dockerfile: Dockerfile
+  #   container_name: b25-dashboard-server
+  #   ports:
+  #     - "8080:8080"
+  #   depends_on:
+  #     - redis
+  #   networks:
+  #     - b25-network
+
+  # web-dashboard:
+  #   build:
+  #     context: ../ui/web
+  #     dockerfile: Dockerfile
+  #   container_name: b25-web-dashboard
+  #   ports:
+  #     - "3000:80"
+  #   depends_on:
+  #     - dashboard-server
+  #   networks:
+  #     - b25-network
+
+networks:
+  b25-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+  postgres-data:
+  timescaledb-data:
+  prometheus-data:
+  grafana-data:

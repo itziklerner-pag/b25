@@ -1,0 +1,38 @@
+# Binaries
+*.exe
+*.dll
+*.so
+*.dylib
+notification-service
+
+# Test files
+*_test.go
+tests/
+coverage.out
+
+# Development files
+.env
+.env.local
+config.yaml
+*.log
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Documentation
+*.md
+docs/
+
+# CI/CD
+.github/
+
+# Temporary files
+tmp/
+temp/
