@@ -1,0 +1,284 @@
+name: CI - Selective Service Builds
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  # Detect which services changed
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      market-data: ${{ steps.filter.outputs.market-data }}
+      order-execution: ${{ steps.filter.outputs.order-execution }}
+      strategy-engine: ${{ steps.filter.outputs.strategy-engine }}
+      account-monitor: ${{ steps.filter.outputs.account-monitor }}
+      dashboard-server: ${{ steps.filter.outputs.dashboard-server }}
+      risk-manager: ${{ steps.filter.outputs.risk-manager }}
+      configuration: ${{ steps.filter.outputs.configuration }}
+      terminal-ui: ${{ steps.filter.outputs.terminal-ui }}
+      web-dashboard: ${{ steps.filter.outputs.web-dashboard }}
+      shared: ${{ steps.filter.outputs.shared }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            market-data:
+              - 'services/market-data/**'
+              - 'shared/proto/**'
+              - 'shared/lib/rust/**'
+            order-execution:
+              - 'services/order-execution/**'
+              - 'shared/proto/**'
+              - 'shared/lib/go/**'
+            strategy-engine:
+              - 'services/strategy-engine/**'
+              - 'shared/proto/**'
+              - 'shared/lib/go/**'
+              - 'shared/lib/python/**'
+            account-monitor:
+              - 'services/account-monitor/**'
+              - 'shared/proto/**'
+              - 'shared/lib/go/**'
+            dashboard-server:
+              - 'services/dashboard-server/**'
+              - 'shared/proto/**'
+              - 'shared/lib/go/**'
+            risk-manager:
+              - 'services/risk-manager/**'
+              - 'shared/proto/**'
+              - 'shared/lib/go/**'
+            configuration:
+              - 'services/configuration/**'
+              - 'shared/proto/**'
+              - 'shared/lib/go/**'
+            terminal-ui:
+              - 'ui/terminal/**'
+              - 'shared/proto/**'
+              - 'shared/lib/rust/**'
+            web-dashboard:
+              - 'ui/web/**'
+              - 'shared/schemas/**'
+            shared:
+              - 'shared/**'
+
+  # Rust services
+  test-market-data:
+    name: Test - Market Data Service
+    needs: changes
+    if: needs.changes.outputs.market-data == 'true' || needs.changes.outputs.shared == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: services/market-data
+      - name: Check formatting
+        run: cd services/market-data && cargo fmt -- --check
+      - name: Clippy
+        run: cd services/market-data && cargo clippy -- -D warnings
+      - name: Run tests
+        run: cd services/market-data && cargo test
+      - name: Build
+        run: cd services/market-data && cargo build --release
+
+  # Go services
+  test-order-execution:
+    name: Test - Order Execution Service
+    needs: changes
+    if: needs.changes.outputs.order-execution == 'true' || needs.changes.outputs.shared == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+          cache-dependency-path: services/order-execution/go.sum
+      - name: Run tests
+        run: cd services/order-execution && go test -v -race -coverprofile=coverage.out ./...
+      - name: Build
+        run: cd services/order-execution && go build -o bin/order-execution ./cmd/server
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: services/order-execution/coverage.out
+          flags: order-execution
+
+  test-strategy-engine:
+    name: Test - Strategy Engine Service
+    needs: changes
+    if: needs.changes.outputs.strategy-engine == 'true' || needs.changes.outputs.shared == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+          cache-dependency-path: services/strategy-engine/go.sum
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Run tests
+        run: cd services/strategy-engine && go test -v -race -coverprofile=coverage.out ./...
+      - name: Build
+        run: cd services/strategy-engine && go build -o bin/strategy-engine ./cmd/server
+
+  test-account-monitor:
+    name: Test - Account Monitor Service
+    needs: changes
+    if: needs.changes.outputs.account-monitor == 'true' || needs.changes.outputs.shared == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+          cache-dependency-path: services/account-monitor/go.sum
+      - name: Run tests
+        run: cd services/account-monitor && go test -v -race -coverprofile=coverage.out ./...
+      - name: Build
+        run: cd services/account-monitor && go build -o bin/account-monitor ./cmd/server
+
+  test-dashboard-server:
+    name: Test - Dashboard Server Service
+    needs: changes
+    if: needs.changes.outputs.dashboard-server == 'true' || needs.changes.outputs.shared == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+          cache-dependency-path: services/dashboard-server/go.sum
+      - name: Run tests
+        run: cd services/dashboard-server && go test -v -race -coverprofile=coverage.out ./...
+      - name: Build
+        run: cd services/dashboard-server && go build -o bin/dashboard-server ./cmd/server
+
+  test-risk-manager:
+    name: Test - Risk Manager Service
+    needs: changes
+    if: needs.changes.outputs.risk-manager == 'true' || needs.changes.outputs.shared == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+          cache-dependency-path: services/risk-manager/go.sum
+      - name: Run tests
+        run: cd services/risk-manager && go test -v -race -coverprofile=coverage.out ./...
+      - name: Build
+        run: cd services/risk-manager && go build -o bin/risk-manager ./cmd/server
+
+  test-configuration:
+    name: Test - Configuration Service
+    needs: changes
+    if: needs.changes.outputs.configuration == 'true' || needs.changes.outputs.shared == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+          cache-dependency-path: services/configuration/go.sum
+      - name: Run tests
+        run: cd services/configuration && go test -v -race -coverprofile=coverage.out ./...
+      - name: Build
+        run: cd services/configuration && go build -o bin/configuration ./cmd/server
+
+  # Terminal UI
+  test-terminal-ui:
+    name: Test - Terminal UI
+    needs: changes
+    if: needs.changes.outputs.terminal-ui == 'true' || needs.changes.outputs.shared == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ui/terminal
+      - name: Run tests
+        run: cd ui/terminal && cargo test
+      - name: Build
+        run: cd ui/terminal && cargo build --release
+
+  # Web Dashboard
+  test-web-dashboard:
+    name: Test - Web Dashboard
+    needs: changes
+    if: needs.changes.outputs.web-dashboard == 'true' || needs.changes.outputs.shared == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: ui/web/package-lock.json
+      - name: Install dependencies
+        run: cd ui/web && npm ci
+      - name: Lint
+        run: cd ui/web && npm run lint
+      - name: Type check
+        run: cd ui/web && npm run type-check
+      - name: Run tests
+        run: cd ui/web && npm run test
+      - name: Build
+        run: cd ui/web && npm run build
+
+  # Integration tests (run if any service changed)
+  integration-tests:
+    name: Integration Tests
+    needs: changes
+    if: |
+      needs.changes.outputs.market-data == 'true' ||
+      needs.changes.outputs.order-execution == 'true' ||
+      needs.changes.outputs.strategy-engine == 'true' ||
+      needs.changes.outputs.account-monitor == 'true' ||
+      needs.changes.outputs.dashboard-server == 'true' ||
+      needs.changes.outputs.shared == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start services with Docker Compose
+        run: docker-compose -f docker/docker-compose.dev.yml up -d
+      - name: Wait for services
+        run: sleep 30
+      - name: Run integration tests
+        run: ./scripts/test-integration.sh
+      - name: Stop services
+        run: docker-compose -f docker/docker-compose.dev.yml down
+
+  # All checks passed
+  ci-success:
+    name: CI Success
+    needs:
+      - test-market-data
+      - test-order-execution
+      - test-strategy-engine
+      - test-account-monitor
+      - test-dashboard-server
+      - test-risk-manager
+      - test-configuration
+      - test-terminal-ui
+      - test-web-dashboard
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check all jobs
+        run: |
+          if [ "${{ contains(needs.*.result, 'failure') }}" == "true" ]; then
+            echo "One or more jobs failed"
+            exit 1
+          fi
+          echo "All jobs passed or were skipped"

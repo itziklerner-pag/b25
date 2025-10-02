@@ -1,0 +1,199 @@
+name: Docker Build & Push
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository }}
+
+jobs:
+  # Detect which services changed
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      market-data: ${{ steps.filter.outputs.market-data }}
+      order-execution: ${{ steps.filter.outputs.order-execution }}
+      strategy-engine: ${{ steps.filter.outputs.strategy-engine }}
+      account-monitor: ${{ steps.filter.outputs.account-monitor }}
+      dashboard-server: ${{ steps.filter.outputs.dashboard-server }}
+      risk-manager: ${{ steps.filter.outputs.risk-manager }}
+      configuration: ${{ steps.filter.outputs.configuration }}
+      terminal-ui: ${{ steps.filter.outputs.terminal-ui }}
+      web-dashboard: ${{ steps.filter.outputs.web-dashboard }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            market-data:
+              - 'services/market-data/**'
+              - 'shared/**'
+            order-execution:
+              - 'services/order-execution/**'
+              - 'shared/**'
+            strategy-engine:
+              - 'services/strategy-engine/**'
+              - 'shared/**'
+            account-monitor:
+              - 'services/account-monitor/**'
+              - 'shared/**'
+            dashboard-server:
+              - 'services/dashboard-server/**'
+              - 'shared/**'
+            risk-manager:
+              - 'services/risk-manager/**'
+              - 'shared/**'
+            configuration:
+              - 'services/configuration/**'
+              - 'shared/**'
+            terminal-ui:
+              - 'ui/terminal/**'
+              - 'shared/**'
+            web-dashboard:
+              - 'ui/web/**'
+
+  # Build and push Docker images
+  build-market-data:
+    name: Build - Market Data
+    needs: changes
+    if: needs.changes.outputs.market-data == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/market-data
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+      - uses: docker/build-push-action@v5
+        with:
+          context: ./services/market-data
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  build-order-execution:
+    name: Build - Order Execution
+    needs: changes
+    if: needs.changes.outputs.order-execution == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/order-execution
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=sha
+      - uses: docker/build-push-action@v5
+        with:
+          context: ./services/order-execution
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  build-strategy-engine:
+    name: Build - Strategy Engine
+    needs: changes
+    if: needs.changes.outputs.strategy-engine == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/strategy-engine
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=sha
+      - uses: docker/build-push-action@v5
+        with:
+          context: ./services/strategy-engine
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  build-web-dashboard:
+    name: Build - Web Dashboard
+    needs: changes
+    if: needs.changes.outputs.web-dashboard == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/web-dashboard
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=sha
+      - uses: docker/build-push-action@v5
+        with:
+          context: ./ui/web
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Add similar jobs for other services...
+  # (account-monitor, dashboard-server, risk-manager, configuration, terminal-ui)

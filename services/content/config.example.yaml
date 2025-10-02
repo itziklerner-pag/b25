@@ -1,0 +1,24 @@
+# Content Management Service Configuration
+
+server:
+  host: 0.0.0.0
+  port: 8080
+
+database:
+  host: localhost
+  port: 5432
+  user: postgres
+  password: postgres
+  dbname: content_db
+  sslmode: disable
+
+jwt:
+  secret: "your-secret-key-change-me-in-production"
+  expiry: 24h  # Token expiration time
+
+upload:
+  path: ./uploads
+  base_url: http://localhost:8080/uploads
+
+log:
+  level: info  # debug, info, warn, error

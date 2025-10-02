@@ -1,0 +1,124 @@
+server:
+  port: 9097
+  host: "0.0.0.0"
+  mode: "development" # development, production
+  upload_path: "/tmp/media-uploads"
+  max_upload_size: 104857600 # 100MB in bytes
+
+storage:
+  type: "s3" # s3, local
+  s3:
+    endpoint: "http://localhost:9000" # MinIO for dev, AWS S3 endpoint for prod
+    region: "us-east-1"
+    bucket: "b25-media"
+    access_key: "minioadmin"
+    secret_key: "minioadmin"
+    use_ssl: false
+    force_path_style: true # Required for MinIO
+  local:
+    base_path: "/var/media/b25"
+
+database:
+  host: "localhost"
+  port: 5432
+  user: "b25_media"
+  password: "b25_media_pass"
+  dbname: "b25_media"
+  sslmode: "disable"
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: 300 # seconds
+
+redis:
+  host: "localhost"
+  port: 6379
+  password: ""
+  db: 0
+  pool_size: 10
+
+cdn:
+  enabled: true
+  base_url: "https://cdn.example.com"
+  cache_ttl: 86400 # 24 hours in seconds
+  purge_on_delete: true
+
+processing:
+  image:
+    max_width: 4096
+    max_height: 4096
+    quality: 85
+    formats: ["jpeg", "png", "webp"]
+    thumbnails:
+      - name: "small"
+        width: 150
+        height: 150
+      - name: "medium"
+        width: 300
+        height: 300
+      - name: "large"
+        width: 800
+        height: 600
+  video:
+    max_duration: 3600 # 1 hour in seconds
+    max_size: 524288000 # 500MB
+    output_formats: ["mp4", "webm"]
+    codecs:
+      video: "libx264"
+      audio: "aac"
+    profiles:
+      - name: "480p"
+        width: 854
+        height: 480
+        bitrate: "1000k"
+      - name: "720p"
+        width: 1280
+        height: 720
+        bitrate: "2500k"
+      - name: "1080p"
+        width: 1920
+        height: 1080
+        bitrate: "5000k"
+    thumbnail:
+      time: "00:00:01"
+      width: 320
+      height: 180
+
+security:
+  enable_virus_scan: true
+  clamav:
+    host: "localhost"
+    port: 3310
+  allowed_mime_types:
+    - "image/jpeg"
+    - "image/png"
+    - "image/gif"
+    - "image/webp"
+    - "video/mp4"
+    - "video/webm"
+    - "video/quicktime"
+    - "application/pdf"
+  max_file_size: 104857600 # 100MB
+
+quota:
+  enabled: true
+  default_user_quota: 1073741824 # 1GB
+  default_org_quota: 10737418240 # 10GB
+  check_interval: 300 # seconds
+
+streaming:
+  enabled: true
+  chunk_size: 1048576 # 1MB
+  supported_protocols: ["http", "hls"]
+
+metrics:
+  enabled: true
+  path: "/metrics"
+
+health:
+  path: "/health"
+
+logging:
+  level: "info" # debug, info, warn, error
+  format: "json" # json, text
+  output: "stdout" # stdout, file
+  file_path: "/var/log/media-service.log"

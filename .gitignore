@@ -1,0 +1,241 @@
+# HFT Trading System - Monorepo .gitignore
+
+# ============================================
+# General
+# ============================================
+*.log
+*.tmp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ============================================
+# Secrets and Credentials (CRITICAL!)
+# ============================================
+*.pem
+*.key
+*.crt
+*.env
+*.env.*
+!*.env.example
+.env.local
+.env.*.local
+secrets/
+config/production/
+**/api_key*
+**/credentials*
+.secrets
+
+# ============================================
+# Rust (market-data, terminal-ui)
+# ============================================
+services/market-data/target/
+services/market-data/Cargo.lock
+ui/terminal/target/
+ui/terminal/Cargo.lock
+**/*.rs.bk
+*.pdb
+
+# ============================================
+# Go (order-execution, strategy-engine, etc.)
+# ============================================
+services/*/go.sum
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+
+# ============================================
+# Python (strategy plugins)
+# ============================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.cover
+.hypothesis/
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+dmyrc.json
+.pyre/
+.pytype/
+venv/
+env/
+ENV/
+
+# ============================================
+# Node.js / TypeScript (web dashboard)
+# ============================================
+ui/web/node_modules/
+ui/web/dist/
+ui/web/build/
+ui/web/.next/
+ui/web/.cache/
+ui/web/.vite/
+ui/web/.turbo/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ============================================
+# Docker
+# ============================================
+docker-compose.override.yml
+*.dockerfile.swp
+
+# ============================================
+# Database
+# ============================================
+*.db
+*.sqlite
+*.sqlite3
+data/
+pgdata/
+redis-data/
+timescaledb-data/
+
+# ============================================
+# IDE and Editors
+# ============================================
+# VSCode
+.vscode/
+!.vscode/settings.json.example
+!.vscode/extensions.json.example
+*.code-workspace
+
+# JetBrains (IntelliJ, GoLand, etc.)
+.idea/
+*.iml
+*.iws
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# Vim
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+Session.vim
+.netrwhist
+
+# ============================================
+# CI/CD
+# ============================================
+.github/workflows/*.yml.bak
+
+# ============================================
+# Testing
+# ============================================
+coverage/
+*.cover
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+nosetests.xml
+coverage.xml
+*.coverprofile
+junit.xml
+test-results/
+
+# ============================================
+# Build Artifacts
+# ============================================
+bin/
+pkg/
+*.o
+*.a
+*.lib
+*.out
+
+# ============================================
+# Monitoring and Observability
+# ============================================
+services/metrics/prometheus/data/
+services/metrics/grafana/data/
+services/metrics/loki/data/
+*.rdb
+
+# ============================================
+# Logs
+# ============================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ============================================
+# Temporary Files
+# ============================================
+tmp/
+temp/
+*.tmp
+*.temp
+
+# ============================================
+# OS
+# ============================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# ============================================
+# Documentation Build
+# ============================================
+docs/_build/
+docs/.doctrees/
+site/
+
+# ============================================
+# Backups
+# ============================================
+*.bak
+*.backup
+*.old
+*-backup
+*-old

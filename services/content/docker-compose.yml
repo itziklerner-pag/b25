@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: content-postgres
+    environment:
+      POSTGRES_DB: content_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d content_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  content-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: content-service
+    environment:
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: 8080
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      DATABASE_DBNAME: content_db
+      DATABASE_SSLMODE: disable
+      JWT_SECRET: "development-secret-change-in-production"
+      JWT_EXPIRY: 24h
+      UPLOAD_PATH: /app/uploads
+      UPLOAD_BASE_URL: http://localhost:8080/uploads
+      LOG_LEVEL: info
+    ports:
+      - "8080:8080"
+    volumes:
+      - upload_data:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  postgres_data:
+  upload_data:
+
+networks:
+  default:
+    name: content-service-network

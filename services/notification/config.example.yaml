@@ -1,0 +1,173 @@
+# Notification Service Configuration
+# Copy to config.yaml and fill in your values
+
+server:
+  host: "0.0.0.0"
+  port: 9097
+  mode: "development" # development, staging, production
+  read_timeout: 30s
+  write_timeout: 30s
+  shutdown_timeout: 10s
+
+database:
+  host: "localhost"
+  port: 5432
+  user: "notification_user"
+  password: "your_password_here"
+  dbname: "notification_db"
+  sslmode: "disable"
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: 5m
+
+redis:
+  host: "localhost"
+  port: 6379
+  password: ""
+  db: 0
+  max_retries: 3
+  pool_size: 10
+
+queue:
+  # Asynq queue configuration
+  redis_addr: "localhost:6379"
+  concurrency: 20
+  max_retry: 3
+  retry_delay_base: 5s # exponential backoff base
+  retention_days: 7
+
+# Email provider configuration
+email:
+  provider: "sendgrid" # sendgrid, smtp
+  from_address: "notifications@trading-system.com"
+  from_name: "B25 Trading System"
+
+  # SendGrid
+  sendgrid:
+    api_key: "your_sendgrid_api_key"
+
+  # SMTP (alternative)
+  smtp:
+    host: "smtp.gmail.com"
+    port: 587
+    username: "your_email@gmail.com"
+    password: "your_password"
+    use_tls: true
+
+# SMS provider configuration
+sms:
+  provider: "twilio" # twilio, aws_sns
+
+  # Twilio
+  twilio:
+    account_sid: "your_twilio_account_sid"
+    auth_token: "your_twilio_auth_token"
+    from_number: "+1234567890"
+
+# Push notification configuration
+push:
+  provider: "fcm" # fcm (Firebase Cloud Messaging)
+
+  # Firebase
+  fcm:
+    credentials_file: "path/to/firebase-credentials.json"
+    project_id: "your_project_id"
+
+# Notification preferences
+preferences:
+  default_channels:
+    - email
+  opt_in_required: false
+  quiet_hours_start: "22:00"
+  quiet_hours_end: "08:00"
+  respect_quiet_hours: true
+
+# Rate limiting
+rate_limit:
+  # Per user per channel
+  email_per_hour: 50
+  sms_per_hour: 20
+  push_per_hour: 100
+
+  # Global limits
+  global_per_second: 100
+
+# Template configuration
+templates:
+  directory: "./internal/templates"
+  auto_reload: true # reload templates on change (dev only)
+  cache_enabled: true
+
+# Logging
+logging:
+  level: "info" # debug, info, warn, error
+  format: "json" # json, console
+  output: "stdout" # stdout, file
+  file_path: "/var/log/notification-service/app.log"
+  max_size_mb: 100
+  max_backups: 3
+  max_age_days: 30
+
+# Metrics and monitoring
+metrics:
+  enabled: true
+  port: 9098
+  path: "/metrics"
+
+# Health checks
+health:
+  enabled: true
+  path: "/health"
+  readiness_path: "/ready"
+
+# Service discovery
+service_discovery:
+  enabled: false
+  consul_addr: "localhost:8500"
+  service_name: "notification-service"
+
+# Message queue subscriptions for event-driven notifications
+subscriptions:
+  nats:
+    enabled: true
+    url: "nats://localhost:4222"
+    subjects:
+      - "trading.alerts.*"
+      - "account.updates.*"
+      - "risk.violations.*"
+      - "orders.critical.*"
+
+  redis_pubsub:
+    enabled: true
+    channels:
+      - "system.alerts"
+      - "trading.notifications"
+
+# Notification rules for automated alerts
+alert_rules:
+  # High priority alerts (immediate delivery)
+  critical:
+    channels: ["email", "sms", "push"]
+    retry_max: 5
+    retry_delay: "1m"
+
+  # Medium priority
+  warning:
+    channels: ["email", "push"]
+    retry_max: 3
+    retry_delay: "5m"
+
+  # Low priority
+  info:
+    channels: ["push"]
+    retry_max: 1
+    retry_delay: "15m"
+
+# Integration with other services
+services:
+  account_monitor:
+    url: "http://localhost:9093"
+  risk_manager:
+    url: "http://localhost:9095"
+  order_execution:
+    url: "http://localhost:9091"

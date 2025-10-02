@@ -1,0 +1,39 @@
+server:
+  port: 9097
+  environment: development
+  read_timeout: 30
+  write_timeout: 30
+  idle_timeout: 120
+
+database:
+  host: localhost
+  port: 5432
+  user: postgres
+  password: your_db_password
+  database: payment_db
+  ssl_mode: disable
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: 300
+
+redis:
+  host: localhost
+  port: 6379
+  password: ""
+  db: 0
+
+stripe:
+  secret_key: sk_test_your_stripe_secret_key
+  publishable_key: pk_test_your_stripe_publishable_key
+  webhook_secret: whsec_your_webhook_secret
+  api_version: "2023-10-16"
+
+security:
+  jwt_secret: your_jwt_secret_key_here
+  encryption_key: your_32_character_encryption_key
+  allowed_origins:
+    - http://localhost:3000
+    - http://localhost:8080
+  rate_limit_per_minute: 100
+  enable_ip_whitelist: false
+  ip_whitelist: []
