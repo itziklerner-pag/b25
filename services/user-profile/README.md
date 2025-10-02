@@ -2,6 +2,18 @@
 
 A production-ready microservice for managing user profiles with CRUD operations, privacy settings, and authentication.
 
+## JavaScript-Only Policy
+
+**IMPORTANT:** This service follows a strict JavaScript-only policy:
+
+- All code must be written in pure JavaScript (ES6+)
+- NO TypeScript syntax or type annotations allowed
+- Use `.js` file extensions only (no `.ts` files)
+- Use JSDoc comments for type documentation when needed
+- Focus on clean, well-documented JavaScript code
+
+See the main [CONTRIBUTING.md](../../CONTRIBUTING.md) for detailed guidelines.
+
 ## Features
 
 - **CRUD Operations**: Create, read, update, and delete user profiles
@@ -13,12 +25,12 @@ A production-ready microservice for managing user profiles with CRUD operations,
 - **Health Checks**: Kubernetes-ready health and readiness probes
 - **Rate Limiting**: Built-in rate limiting for API protection
 - **Logging**: Structured logging with Winston
-- **TypeScript**: Full type safety throughout the codebase
+- **JSDoc**: Type documentation using JSDoc comments
 
 ## Tech Stack
 
 - **Runtime**: Node.js 18+
-- **Language**: TypeScript
+- **Language**: JavaScript (ES6+)
 - **Framework**: Express.js
 - **Database**: PostgreSQL 15+
 - **Authentication**: JWT (jsonwebtoken)
@@ -284,7 +296,7 @@ Environment variables:
 # Development with hot reload
 npm run dev
 
-# Build TypeScript
+# Build (if needed for any transpilation)
 npm run build
 
 # Run tests
@@ -302,9 +314,6 @@ npm run lint
 # Format code
 npm run format
 
-# Type checking
-npm run typecheck
-
 # Database migration
 npm run migrate
 ```
@@ -320,7 +329,7 @@ user-profile/
 │   ├── middleware/      # Express middleware
 │   ├── models/          # Data models and repositories
 │   ├── routes/          # API routes
-│   ├── types/           # TypeScript type definitions
+│   ├── types/           # JSDoc type definitions and helpers
 │   ├── utils/           # Utility functions
 │   ├── validators/      # Input validation schemas
 │   ├── app.ts           # Express app configuration
@@ -328,8 +337,7 @@ user-profile/
 ├── __tests__/           # Test files
 ├── Dockerfile           # Docker image definition
 ├── docker-compose.yml   # Docker Compose configuration
-├── package.json         # Dependencies and scripts
-└── tsconfig.json        # TypeScript configuration
+└── package.json         # Dependencies and scripts
 ```
 
 ## Health Checks

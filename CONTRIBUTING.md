@@ -106,6 +106,42 @@ git push origin feature/your-feature-name
 
 Then create a Pull Request on GitHub.
 
+## 📜 JavaScript-Only Policy
+
+**CRITICAL:** This project enforces a strict JavaScript-only policy for all Node.js services and web interfaces:
+
+### Rules
+
+- **NO TypeScript**: All code must be written in pure JavaScript (ES6+)
+- **NO Type Annotations**: Do not use TypeScript syntax or type annotations
+- **NO .ts or .tsx files**: Source code must use `.js` and `.jsx` extensions only
+- **Use JSDoc**: Document types using JSDoc comments when needed for clarity
+- **Modern JavaScript**: Use ES6+ features (async/await, arrow functions, destructuring, etc.)
+
+### Example JSDoc Usage
+
+```javascript
+/**
+ * Processes an order request
+ * @param {Object} order - The order object
+ * @param {string} order.symbol - Trading symbol
+ * @param {number} order.quantity - Order quantity
+ * @param {string} order.side - Order side ('buy' or 'sell')
+ * @returns {Promise<Object>} Processed order result
+ */
+async function processOrder(order) {
+  // Implementation
+}
+```
+
+### Rationale
+
+- Simplicity and transparency
+- Reduced build complexity
+- Easier debugging
+- No type system overhead
+- Focus on runtime behavior
+
 ## 💅 Code Style
 
 ### Rust
@@ -120,11 +156,13 @@ Then create a Pull Request on GitHub.
 - Use `golangci-lint`: `golangci-lint run`
 - Follow [Effective Go](https://go.dev/doc/effective_go)
 
-### TypeScript/JavaScript
+### JavaScript
 
 - Use ESLint: `npm run lint`
 - Use Prettier: `npm run format`
 - Follow project's ESLint config
+- Use JSDoc for type documentation
+- **NO TypeScript**: JavaScript only
 
 ### Python
 
@@ -145,7 +183,7 @@ cargo test
 # Go
 go test ./...
 
-# TypeScript
+# JavaScript (Node.js)
 npm test
 
 # Python
@@ -183,7 +221,7 @@ cargo tarpaulin
 # Go
 go test -cover ./...
 
-# TypeScript
+# JavaScript
 npm run test:coverage
 ```
 
@@ -245,11 +283,13 @@ npm run test:coverage
 - **Hot-Reload**: Test hot-reload functionality
 - **Example Strategies**: Update examples if interface changes
 
-### Web Dashboard (React/TypeScript)
+### Web Dashboard (React/JavaScript)
 
+- **JavaScript Only**: No TypeScript allowed
 - **Mobile-First**: Ensure mobile responsiveness
 - **Accessibility**: Follow WCAG guidelines
 - **Performance**: Bundle size <500KB
+- **JSDoc**: Document complex functions and data structures
 
 ## 🔍 Code Review Guidelines
 

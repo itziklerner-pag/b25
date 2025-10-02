@@ -2,8 +2,20 @@
 
 Modern web-based dashboard for HFT trading system.
 
-**Stack**: React 18 + TypeScript + Vite  
+**Stack**: React 18 + JavaScript + Vite
 **Development Plan**: `../../docs/service-plans/10-web-dashboard-service.md`
+
+## JavaScript-Only Policy
+
+This project follows a strict **JavaScript-only policy**:
+
+- All code must be written in pure JavaScript (ES6+)
+- NO TypeScript syntax or type annotations
+- Use `.js` and `.jsx` file extensions only
+- Use JSDoc comments for type documentation when needed
+- No `.ts` or `.tsx` files allowed in source code
+
+See the main [CONTRIBUTING.md](../../CONTRIBUTING.md) for detailed guidelines.
 
 ## Quick Start
 ```bash

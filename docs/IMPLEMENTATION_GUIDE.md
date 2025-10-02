@@ -62,6 +62,16 @@ Before starting implementation, ensure you have:
 
 ## Technology Selection
 
+### JavaScript-Only Policy for Web Services
+
+**IMPORTANT:** This project enforces a strict JavaScript-only policy for all Node.js-based services and web interfaces:
+
+- **NO TypeScript**: All Node.js code must be written in pure JavaScript (ES6+)
+- **NO Type Annotations**: Do not use TypeScript syntax or type annotations
+- **NO .ts or .tsx files**: Source code must use `.js` and `.jsx` extensions only
+- **Use JSDoc**: Document types using JSDoc comments when needed for clarity
+- **Modern JavaScript**: Use ES6+ features (async/await, arrow functions, destructuring, etc.)
+
 ### Guiding Principles
 
 1. **Latency-Critical Path (Data Plane):**
@@ -87,8 +97,8 @@ Before starting implementation, ensure you have:
 | Order Execution | Latency | Rust, C++, Go | Critical path requires speed |
 | Account Monitor | Reliability | Rust, Go, Java | Needs robust error handling |
 | Strategy Engine | Flexibility | Python, JavaScript, Go | Rapid strategy development, hot-reload |
-| Dashboard Server | Performance | Rust, Go, Node.js | Handle many WebSocket connections |
-| Web Dashboard | UX | TypeScript/JavaScript | Browser-based, rich frameworks available |
+| Dashboard Server | Performance | Rust, Go, Node.js (JavaScript only) | Handle many WebSocket connections |
+| Web Dashboard | UX | JavaScript (ES6+) | Browser-based, NO TypeScript allowed |
 | TUI Dashboard | Performance | Rust, Go, C++ | Direct terminal control |
 
 ### Database Selection
@@ -722,10 +732,32 @@ Basic layout:
 
 #### Option B: Web Dashboard
 
+**IMPORTANT:** Use JavaScript only - NO TypeScript allowed.
+
 Use frameworks like:
-- React + TypeScript
-- Vue.js + TypeScript
-- Svelte + TypeScript
+- React + JavaScript (ES6+)
+- Vue.js + JavaScript
+- Svelte + JavaScript
+
+**JSDoc Example:**
+```javascript
+/**
+ * Display a metric card
+ * @param {Object} props
+ * @param {string} props.title - Card title
+ * @param {number} props.value - Metric value
+ * @param {string} props.unit - Unit of measurement
+ * @returns {JSX.Element}
+ */
+function MetricCard({ title, value, unit }) {
+  return (
+    <div className="metric-card">
+      <h3>{title}</h3>
+      <span>{value} {unit}</span>
+    </div>
+  );
+}
+```
 
 Components:
 - `<MetricCard />` - Display key metrics

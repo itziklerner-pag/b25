@@ -91,7 +91,7 @@ b25/
 │   │   ├── config.example.yaml
 │   │   └── README.md
 │   │
-│   └── web/                         # React/TypeScript - Web dashboard
+│   └── web/                         # React/JavaScript - Web dashboard
 │       ├── src/
 │       │   ├── components/
 │       │   ├── pages/
@@ -101,7 +101,7 @@ b25/
 │       ├── public/
 │       ├── tests/
 │       ├── package.json
-│       ├── vite.config.ts
+│       ├── vite.config.js
 │       ├── Dockerfile
 │       └── README.md
 │
