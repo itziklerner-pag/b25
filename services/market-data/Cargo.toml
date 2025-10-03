@@ -1,0 +1,67 @@
+[package]
+name = "market-data-service"
+version = "0.1.0"
+edition = "2021"
+authors = ["B25 Team"]
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.35", features = ["full", "rt-multi-thread"] }
+tokio-tungstenite = { version = "0.21", features = ["native-tls"] }
+futures-util = "0.3"
+
+# WebSocket
+tungstenite = "0.21"
+url = "2.5"
+
+# Redis
+redis = { version = "0.24", features = ["tokio-comp", "connection-manager"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# HTTP server for health/metrics
+axum = "0.7"
+tower = "0.4"
+tower-http = { version = "0.5", features = ["trace"] }
+
+# Metrics
+prometheus = { version = "0.13", features = ["process"] }
+lazy_static = "1.4"
+
+# Configuration
+config = "0.14"
+serde_yaml = "0.9"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Shared memory IPC
+shared_memory = "0.12"
+crossbeam = "0.8"
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Hashing
+ahash = "0.8"
+
+[dev-dependencies]
+mockito = "1.2"
+tokio-test = "0.4"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.bench]
+inherits = "release"

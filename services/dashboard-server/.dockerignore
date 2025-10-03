@@ -1,0 +1,37 @@
+# Binaries
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test files
+*_test.go
+test/
+tests/
+
+# Development files
+.env
+.env.local
+*.log
+
+# Documentation
+*.md
+README.md
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Dependencies
+vendor/

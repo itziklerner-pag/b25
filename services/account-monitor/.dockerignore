@@ -1,0 +1,36 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+
+# Build artifacts
+bin/
+*.exe
+*.test
+
+# Config files with secrets
+config.yaml
+.env
+.env.local
+
+# Documentation
+README.md
+*.md
+
+# Tests
+*_test.go
+coverage.out
+coverage.html
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

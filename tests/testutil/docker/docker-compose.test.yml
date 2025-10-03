@@ -1,0 +1,176 @@
+version: '3.8'
+
+services:
+  # Redis for caching and pub/sub
+  redis-test:
+    image: redis:7-alpine
+    container_name: b25-redis-test
+    ports:
+      - "6380:6379"
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - test-network
+
+  # NATS for messaging
+  nats-test:
+    image: nats:2.10-alpine
+    container_name: b25-nats-test
+    ports:
+      - "4223:4222"
+      - "8223:8222"
+      - "6223:6222"
+    command: ["-js", "-m", "8222"]
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8222/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - test-network
+
+  # PostgreSQL for persistent storage
+  postgres-test:
+    image: postgres:16-alpine
+    container_name: b25-postgres-test
+    environment:
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpass
+      POSTGRES_DB: b25_test
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-test-data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U testuser -d b25_test"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - test-network
+
+  # TimescaleDB for time-series data
+  timescale-test:
+    image: timescale/timescaledb:latest-pg16
+    container_name: b25-timescale-test
+    environment:
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpass
+      POSTGRES_DB: timescale_test
+    ports:
+      - "5434:5432"
+    volumes:
+      - timescale-test-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U testuser -d timescale_test"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - test-network
+
+  # Mock Exchange Server
+  mock-exchange:
+    build:
+      context: ../..
+      dockerfile: tests/testutil/docker/Dockerfile.mock-exchange
+    container_name: b25-mock-exchange
+    ports:
+      - "8545:8545"  # HTTP API
+      - "8546:8546"  # WebSocket
+    environment:
+      - HTTP_ADDR=:8545
+      - WS_ADDR=:8546
+      - ORDER_LATENCY=10ms
+      - FILL_DELAY=50ms
+      - REJECT_RATE=0.0
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8545/api/v3/exchangeInfo"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - test-network
+
+  # Order Execution Service (for integration tests)
+  order-execution-test:
+    build:
+      context: ../..
+      dockerfile: services/order-execution/Dockerfile
+    container_name: b25-order-execution-test
+    environment:
+      - REDIS_ADDR=redis-test:6379
+      - NATS_ADDR=nats://nats-test:4222
+      - EXCHANGE_API_URL=http://mock-exchange:8545
+      - EXCHANGE_WS_URL=ws://mock-exchange:8546/ws
+      - TESTNET_MODE=true
+    depends_on:
+      redis-test:
+        condition: service_healthy
+      nats-test:
+        condition: service_healthy
+      mock-exchange:
+        condition: service_healthy
+    networks:
+      - test-network
+
+  # Strategy Engine (for integration tests)
+  strategy-engine-test:
+    build:
+      context: ../..
+      dockerfile: services/strategy-engine/Dockerfile
+    container_name: b25-strategy-engine-test
+    environment:
+      - REDIS_ADDR=redis-test:6379
+      - NATS_ADDR=nats://nats-test:4222
+      - ORDER_EXECUTION_ADDR=order-execution-test:50051
+    depends_on:
+      redis-test:
+        condition: service_healthy
+      nats-test:
+        condition: service_healthy
+      order-execution-test:
+        condition: service_started
+    networks:
+      - test-network
+
+  # Account Monitor (for integration tests)
+  account-monitor-test:
+    build:
+      context: ../..
+      dockerfile: services/account-monitor/Dockerfile
+    container_name: b25-account-monitor-test
+    environment:
+      - REDIS_ADDR=redis-test:6379
+      - NATS_ADDR=nats://nats-test:4222
+      - POSTGRES_ADDR=postgres-test:5432
+      - POSTGRES_USER=testuser
+      - POSTGRES_PASSWORD=testpass
+      - POSTGRES_DB=b25_test
+      - EXCHANGE_API_URL=http://mock-exchange:8545
+      - EXCHANGE_WS_URL=ws://mock-exchange:8546/ws
+    depends_on:
+      redis-test:
+        condition: service_healthy
+      nats-test:
+        condition: service_healthy
+      postgres-test:
+        condition: service_healthy
+      mock-exchange:
+        condition: service_healthy
+    networks:
+      - test-network
+
+volumes:
+  postgres-test-data:
+  timescale-test-data:
+
+networks:
+  test-network:
+    driver: bridge
+    name: b25-test-network

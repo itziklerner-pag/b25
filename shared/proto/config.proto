@@ -1,0 +1,274 @@
+syntax = "proto3";
+
+package b25.config;
+
+import "common.proto";
+
+option go_package = "github.com/b25/shared/proto/gen/go/config";
+
+// Strategy configuration
+message StrategyConfig {
+  string id = 1;                  // Unique strategy ID
+  string name = 2;
+  string type = 3;                // e.g., "market_maker", "momentum", "arbitrage"
+  string version = 4;
+  bool enabled = 5;
+
+  // Strategy parameters (flexible JSON-like structure)
+  map<string, ParameterValue> parameters = 6;
+
+  // Trading configuration
+  repeated b25.common.TradingPair pairs = 7;
+  ExecutionMode execution_mode = 8;
+
+  // Resource limits
+  b25.common.Decimal max_position_size = 9;
+  b25.common.Decimal max_order_size = 10;
+  int32 max_open_orders = 11;
+
+  // Timing
+  int64 update_interval_ms = 12;  // Strategy update frequency
+  int64 max_execution_time_ms = 13;
+
+  // Risk
+  string risk_profile_id = 14;
+
+  b25.common.Timestamp created_at = 15;
+  b25.common.Timestamp updated_at = 16;
+
+  map<string, string> tags = 17;
+}
+
+// Parameter value (supports multiple types)
+message ParameterValue {
+  oneof value {
+    string string_value = 1;
+    int64 int_value = 2;
+    double double_value = 3;
+    bool bool_value = 4;
+    ParameterList list_value = 5;
+    ParameterMap map_value = 6;
+  }
+}
+
+message ParameterList {
+  repeated ParameterValue values = 1;
+}
+
+message ParameterMap {
+  map<string, ParameterValue> values = 1;
+}
+
+enum ExecutionMode {
+  EXECUTION_MODE_UNSPECIFIED = 0;
+  LIVE = 1;               // Real trading
+  SIMULATION = 2;         // Paper trading (orders not submitted)
+  OBSERVATION = 3;        // Only observe and log signals
+  BACKTEST = 4;          // Historical simulation
+}
+
+// Risk limits
+message RiskLimits {
+  string id = 1;
+  string name = 2;
+
+  // Position limits
+  b25.common.Decimal max_position_size = 3;           // Per symbol
+  b25.common.Decimal max_total_position_value = 4;    // Across all symbols
+  b25.common.Decimal max_leverage = 5;
+
+  // Drawdown limits
+  b25.common.Decimal max_daily_drawdown_pct = 6;
+  b25.common.Decimal max_total_drawdown_pct = 7;
+  b25.common.Decimal max_daily_loss_amount = 8;
+
+  // Order limits
+  int32 max_orders_per_second = 9;
+  int32 max_orders_per_minute = 10;
+  int32 max_open_orders = 11;
+  b25.common.Decimal max_order_size = 12;
+  b25.common.Decimal min_order_size = 13;
+
+  // Exposure limits
+  b25.common.Decimal max_correlation_exposure = 14;   // Max correlated position value
+  int32 max_symbols_traded = 15;
+
+  // Circuit breaker
+  int32 max_consecutive_losses = 16;
+  b25.common.Decimal loss_streak_threshold = 17;
+
+  // Margin limits
+  b25.common.Decimal min_margin_ratio = 18;
+  b25.common.Decimal margin_call_ratio = 19;
+
+  b25.common.Timestamp created_at = 20;
+  b25.common.Timestamp updated_at = 21;
+}
+
+// Trading pair configuration
+message TradingPairConfig {
+  b25.common.TradingPair pair = 1;
+  bool enabled = 2;
+
+  // Exchange-specific metadata
+  b25.common.Decimal min_notional = 3;
+  int32 price_precision = 4;
+  int32 quantity_precision = 5;
+  b25.common.Decimal min_quantity = 6;
+  b25.common.Decimal max_quantity = 7;
+  b25.common.Decimal tick_size = 8;
+  b25.common.Decimal step_size = 9;
+
+  // Fees
+  b25.common.Decimal maker_fee_bps = 10;
+  b25.common.Decimal taker_fee_bps = 11;
+
+  // Operational settings
+  int32 order_book_depth = 12;    // Levels to maintain
+  int64 update_interval_ms = 13;  // Market data update frequency
+
+  // Risk settings
+  b25.common.Decimal max_position_size = 14;
+  b25.common.Decimal max_order_size = 15;
+
+  b25.common.Timestamp created_at = 16;
+  b25.common.Timestamp updated_at = 17;
+}
+
+// Exchange configuration
+message ExchangeConfig {
+  b25.common.Exchange exchange = 1;
+  bool enabled = 2;
+
+  // API configuration
+  string api_endpoint = 3;
+  string ws_endpoint = 4;
+  bool testnet = 5;
+
+  // Rate limits
+  int32 rest_requests_per_minute = 6;
+  int32 order_rate_limit = 7;
+  int32 ws_connections_max = 8;
+
+  // Connection settings
+  int64 connect_timeout_ms = 9;
+  int64 read_timeout_ms = 10;
+  int64 ws_ping_interval_ms = 11;
+  int32 max_reconnect_attempts = 12;
+
+  // Reconciliation
+  int64 reconcile_interval_ms = 13;
+  b25.common.Decimal reconcile_threshold = 14;  // Mismatch threshold to alert
+
+  b25.common.Timestamp created_at = 15;
+  b25.common.Timestamp updated_at = 16;
+}
+
+// System configuration
+message SystemConfig {
+  string environment = 1;         // e.g., "production", "staging", "development"
+
+  // Service configurations
+  map<string, ServiceConfig> services = 2;
+
+  // Global settings
+  string log_level = 3;           // e.g., "debug", "info", "warn", "error"
+  bool enable_metrics = 4;
+  bool enable_tracing = 5;
+
+  // Data retention
+  int32 hot_data_retention_hours = 6;
+  int32 warm_data_retention_days = 7;
+  int32 cold_data_retention_days = 8;
+
+  // Performance
+  int32 worker_threads = 9;
+  int64 max_memory_mb = 10;
+
+  b25.common.Timestamp loaded_at = 11;
+}
+
+message ServiceConfig {
+  string name = 1;
+  bool enabled = 2;
+  string host = 3;
+  int32 port = 4;
+  map<string, string> env_vars = 5;
+  map<string, ParameterValue> parameters = 6;
+}
+
+// Alert rule configuration
+message AlertRule {
+  string id = 1;
+  string name = 2;
+  bool enabled = 3;
+
+  AlertSeverity severity = 4;
+  string condition = 5;           // Expression to evaluate
+  map<string, ParameterValue> thresholds = 6;
+
+  // Notification settings
+  repeated string notification_channels = 7;  // e.g., "email", "slack", "pagerduty"
+  int64 cooldown_seconds = 8;     // Min time between alerts
+  int32 max_alerts_per_hour = 9;
+
+  b25.common.Timestamp created_at = 10;
+  b25.common.Timestamp updated_at = 11;
+}
+
+enum AlertSeverity {
+  ALERT_SEVERITY_UNSPECIFIED = 0;
+  INFO = 1;
+  WARNING = 2;
+  CRITICAL = 3;
+}
+
+// Configuration update request
+message UpdateConfigRequest {
+  b25.common.RequestMetadata metadata = 1;
+  oneof config {
+    StrategyConfig strategy = 2;
+    RiskLimits risk_limits = 3;
+    TradingPairConfig pair_config = 4;
+    ExchangeConfig exchange_config = 5;
+    SystemConfig system_config = 6;
+    AlertRule alert_rule = 7;
+  }
+}
+
+// Configuration update response
+message UpdateConfigResponse {
+  b25.common.ResponseMetadata metadata = 1;
+  bool applied = 2;
+  bool requires_restart = 3;
+}
+
+// Query configuration request
+message QueryConfigRequest {
+  b25.common.RequestMetadata metadata = 1;
+  ConfigType config_type = 2;
+  string id = 3;                  // Optional, for specific config
+}
+
+enum ConfigType {
+  CONFIG_TYPE_UNSPECIFIED = 0;
+  STRATEGY = 1;
+  RISK_LIMITS = 2;
+  TRADING_PAIR = 3;
+  EXCHANGE = 4;
+  SYSTEM = 5;
+  ALERT_RULE = 6;
+}
+
+// Query configuration response
+message QueryConfigResponse {
+  b25.common.ResponseMetadata metadata = 1;
+  oneof config {
+    StrategyConfig strategy = 2;
+    RiskLimits risk_limits = 3;
+    TradingPairConfig pair_config = 4;
+    ExchangeConfig exchange_config = 5;
+    SystemConfig system_config = 6;
+    AlertRule alert_rule = 7;
+  }
+}

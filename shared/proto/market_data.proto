@@ -1,0 +1,168 @@
+syntax = "proto3";
+
+package b25.marketdata;
+
+import "common.proto";
+
+option go_package = "github.com/b25/shared/proto/gen/go/marketdata";
+
+// Order book level (price level)
+message OrderBookLevel {
+  b25.common.Price price = 1;
+  b25.common.Quantity quantity = 2;
+  int32 order_count = 3;          // Number of orders at this level (if available)
+}
+
+// Complete order book snapshot
+message OrderBook {
+  b25.common.TradingPair pair = 1;
+  repeated OrderBookLevel bids = 2;
+  repeated OrderBookLevel asks = 3;
+  int64 sequence_number = 4;      // Monotonic sequence for gap detection
+  b25.common.Timestamp exchange_time = 5;
+  b25.common.Timestamp received_time = 6;
+  b25.common.Timestamp processed_time = 7;
+}
+
+// Order book update (delta)
+message OrderBookUpdate {
+  b25.common.TradingPair pair = 1;
+  repeated OrderBookLevel bid_updates = 2;
+  repeated OrderBookLevel ask_updates = 3;
+  int64 sequence_number = 4;
+  b25.common.Timestamp exchange_time = 5;
+  b25.common.Timestamp received_time = 6;
+}
+
+// Individual trade
+message Trade {
+  string trade_id = 1;
+  b25.common.TradingPair pair = 2;
+  b25.common.Side side = 3;       // Aggressor side
+  b25.common.Price price = 4;
+  b25.common.Quantity quantity = 5;
+  bool is_buyer_maker = 6;
+  b25.common.Timestamp exchange_time = 7;
+  b25.common.Timestamp received_time = 8;
+}
+
+// Aggregated trade (multiple small trades)
+message AggregatedTrade {
+  string agg_trade_id = 1;
+  b25.common.TradingPair pair = 2;
+  b25.common.Price price = 3;
+  b25.common.Quantity quantity = 4;
+  int64 first_trade_id = 5;
+  int64 last_trade_id = 6;
+  int32 trade_count = 7;
+  bool is_buyer_maker = 8;
+  b25.common.Timestamp exchange_time = 9;
+  b25.common.Timestamp received_time = 10;
+}
+
+// Ticker/24hr statistics
+message Ticker {
+  b25.common.TradingPair pair = 1;
+  b25.common.Price last_price = 2;
+  b25.common.Price open_price = 3;
+  b25.common.Price high_price = 4;
+  b25.common.Price low_price = 5;
+  b25.common.Quantity volume = 6;
+  b25.common.Quantity quote_volume = 7;
+  b25.common.Decimal price_change_pct = 8;
+  int64 trade_count = 9;
+  b25.common.Timestamp timestamp = 10;
+}
+
+// Candlestick/OHLCV
+message Candlestick {
+  b25.common.TradingPair pair = 1;
+  string interval = 2;            // e.g., "1m", "5m", "1h"
+  b25.common.Timestamp open_time = 3;
+  b25.common.Timestamp close_time = 4;
+  b25.common.Price open = 5;
+  b25.common.Price high = 6;
+  b25.common.Price low = 7;
+  b25.common.Price close = 8;
+  b25.common.Quantity volume = 9;
+  b25.common.Quantity quote_volume = 10;
+  int64 trade_count = 11;
+  bool is_closed = 12;
+}
+
+// Derived market metrics
+message MarketMetrics {
+  b25.common.TradingPair pair = 1;
+  b25.common.Price mid_price = 2;
+  b25.common.Price micro_price = 3;     // Volume-weighted mid price
+  b25.common.Decimal spread_bps = 4;    // Spread in basis points
+  b25.common.Decimal bid_depth = 5;     // Total bid volume
+  b25.common.Decimal ask_depth = 6;     // Total ask volume
+  b25.common.Decimal imbalance = 7;     // (bid_depth - ask_depth) / (bid_depth + ask_depth)
+  b25.common.Decimal volatility = 8;    // Recent volatility estimate
+  b25.common.Timestamp timestamp = 9;
+}
+
+// Market data subscription request
+message SubscribeRequest {
+  b25.common.RequestMetadata metadata = 1;
+  b25.common.TradingPair pair = 2;
+  repeated DataType data_types = 3;
+}
+
+enum DataType {
+  DATA_TYPE_UNSPECIFIED = 0;
+  ORDER_BOOK = 1;
+  ORDER_BOOK_UPDATES = 2;
+  TRADES = 3;
+  AGGREGATED_TRADES = 4;
+  TICKER = 5;
+  CANDLESTICK = 6;
+  METRICS = 7;
+}
+
+// Market data subscription response
+message SubscribeResponse {
+  b25.common.ResponseMetadata metadata = 1;
+  string subscription_id = 2;
+}
+
+// Market data message (union type)
+message MarketDataMessage {
+  oneof data {
+    OrderBook order_book = 1;
+    OrderBookUpdate order_book_update = 2;
+    Trade trade = 3;
+    AggregatedTrade aggregated_trade = 4;
+    Ticker ticker = 5;
+    Candlestick candlestick = 6;
+    MarketMetrics metrics = 7;
+  }
+  b25.common.Timestamp timestamp = 8;
+  int64 sequence = 9;
+}
+
+// Market data snapshot request
+message SnapshotRequest {
+  b25.common.RequestMetadata metadata = 1;
+  b25.common.TradingPair pair = 2;
+  int32 depth = 3;                // Order book depth (e.g., 20, 100, 1000)
+}
+
+// Market data snapshot response
+message SnapshotResponse {
+  b25.common.ResponseMetadata metadata = 1;
+  OrderBook order_book = 2;
+  Ticker ticker = 3;
+}
+
+// Connection status
+message ConnectionStatus {
+  b25.common.Exchange exchange = 1;
+  bool is_connected = 2;
+  b25.common.Timestamp last_heartbeat = 3;
+  int64 messages_received = 4;
+  int64 messages_processed = 5;
+  int64 sequence_gaps = 6;
+  b25.common.Timestamp connected_since = 7;
+}

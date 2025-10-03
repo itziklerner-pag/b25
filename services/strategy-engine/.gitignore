@@ -1,0 +1,53 @@
+# Binaries
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.txt
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+
+# IDE - VSCode
+.vscode/
+*.code-workspace
+
+# IDE - JetBrains
+.idea/
+*.iml
+*.iws
+
+# Configuration
+config.yaml
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.swp
+*.swo
+*~
+
+# Build artifacts
+strategy-engine

@@ -1,0 +1,118 @@
+Strategy Engine Service - File Structure
+=========================================
+
+services/strategy-engine/
+├── cmd/
+│   └── server/
+│       └── main.go                    # Main entry point, HTTP server, signal handling
+│
+├── internal/
+│   ├── config/
+│   │   └── config.go                  # Configuration loading and defaults
+│   │
+│   ├── engine/
+│   │   ├── engine.go                  # Core strategy engine implementation
+│   │   └── plugin_loader.go           # Go plugin loader and Python runner
+│   │
+│   ├── strategies/
+│   │   ├── types.go                   # Strategy interfaces and data structures
+│   │   ├── base.go                    # Base strategy with common functionality
+│   │   ├── registry.go                # Strategy factory registry
+│   │   ├── momentum.go                # Momentum strategy implementation
+│   │   ├── market_making.go           # Market making strategy implementation
+│   │   └── scalping.go                # Scalping strategy implementation
+│   │
+│   ├── risk/
+│   │   └── risk.go                    # Risk management and validation
+│   │
+│   ├── pubsub/
+│   │   ├── redis.go                   # Redis pub/sub for market data
+│   │   └── nats.go                    # NATS messaging for fills/positions
+│   │
+│   └── grpc/
+│       └── client.go                  # gRPC client for order execution
+│
+├── pkg/
+│   ├── logger/
+│   │   └── logger.go                  # Zap-based structured logging
+│   │
+│   └── metrics/
+│       └── metrics.go                 # Prometheus metrics collectors
+│
+├── plugins/
+│   ├── go/
+│   │   ├── example_plugin.go          # Example Go plugin strategy
+│   │   └── README.md                  # Go plugin documentation
+│   │
+│   └── python/
+│       ├── example_strategy.py        # Example Python strategy
+│       ├── requirements.txt           # Python dependencies
+│       └── README.md                  # Python plugin documentation
+│
+├── config.example.yaml                # Example configuration file
+├── Dockerfile                         # Multi-stage Docker build
+├── Makefile                          # Build and development tasks
+├── .dockerignore                     # Docker build exclusions
+├── .gitignore                        # Git exclusions
+├── go.mod                            # Go module definition
+├── go.sum                            # Go module checksums
+└── README.md                         # Service documentation
+
+Key Components:
+===============
+
+1. Engine (/internal/engine/engine.go)
+   - Strategy lifecycle management
+   - Market data subscription (Redis)
+   - Fill/position event subscription (NATS)
+   - Signal aggregation and prioritization
+   - Risk validation
+   - Order submission (gRPC)
+   - Hot reload capability
+
+2. Strategies (/internal/strategies/)
+   - Strategy interface definition
+   - Base strategy with common helpers
+   - Registry for strategy factory pattern
+   - Built-in strategies: momentum, market-making, scalping
+   - Plugin support for custom strategies
+
+3. Risk Manager (/internal/risk/risk.go)
+   - Position size limits
+   - Order value limits
+   - Daily loss tracking
+   - Drawdown monitoring
+   - Rate limiting
+   - Symbol whitelist/blacklist
+
+4. Pub/Sub (/internal/pubsub/)
+   - Redis: Market data subscription
+   - NATS: Fill and position event subscription
+   - Low-latency message processing
+
+5. gRPC Client (/internal/grpc/client.go)
+   - Order execution service integration
+   - Batch order submission
+   - Retry logic
+
+6. Metrics (/pkg/metrics/metrics.go)
+   - Strategy performance metrics
+   - Market data latency
+   - Order submission metrics
+   - Risk violation tracking
+   - Engine health metrics
+
+Execution Flow:
+===============
+
+1. Market Data → Redis Pub/Sub → Engine → Strategies
+2. Strategies → Signals → Queue → Risk Validation
+3. Valid Signals → Priority Sorting → Order Execution (gRPC)
+4. Fills/Positions → NATS → Engine → Strategies
+
+Modes:
+======
+
+- Live: Execute real trades
+- Simulation: Generate signals without execution
+- Observation: Monitor without generating signals

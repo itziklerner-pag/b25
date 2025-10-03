@@ -1,0 +1,145 @@
+syntax = "proto3";
+
+package b25.common;
+
+option go_package = "github.com/b25/shared/proto/gen/go/common";
+
+// Timestamp with nanosecond precision for HFT
+message Timestamp {
+  int64 seconds = 1;       // Unix timestamp in seconds
+  int32 nanos = 2;         // Nanoseconds part (0-999,999,999)
+}
+
+// Exchange identifiers
+enum Exchange {
+  EXCHANGE_UNSPECIFIED = 0;
+  BINANCE_FUTURES = 1;
+  BINANCE_SPOT = 2;
+  BYBIT_FUTURES = 3;
+  BYBIT_SPOT = 4;
+  OKX_FUTURES = 5;
+  OKX_SPOT = 6;
+}
+
+// Order side
+enum Side {
+  SIDE_UNSPECIFIED = 0;
+  BUY = 1;
+  SELL = 2;
+}
+
+// Order type
+enum OrderType {
+  ORDER_TYPE_UNSPECIFIED = 0;
+  LIMIT = 1;
+  MARKET = 2;
+  STOP_LOSS = 3;
+  STOP_LOSS_LIMIT = 4;
+  TAKE_PROFIT = 5;
+  TAKE_PROFIT_LIMIT = 6;
+  LIMIT_MAKER = 7;
+}
+
+// Time in force
+enum TimeInForce {
+  TIF_UNSPECIFIED = 0;
+  GTC = 1;              // Good Till Cancel
+  IOC = 2;              // Immediate or Cancel
+  FOK = 3;              // Fill or Kill
+  POST_ONLY = 4;        // Post only (maker only)
+}
+
+// Order status
+enum OrderStatus {
+  ORDER_STATUS_UNSPECIFIED = 0;
+  NEW = 1;
+  VALIDATING = 2;
+  PENDING_SUBMIT = 3;
+  SUBMITTED = 4;
+  PARTIALLY_FILLED = 5;
+  FILLED = 6;
+  CANCELED = 7;
+  REJECTED = 8;
+  EXPIRED = 9;
+}
+
+// Service health status
+enum HealthStatus {
+  HEALTH_UNKNOWN = 0;
+  HEALTHY = 1;
+  DEGRADED = 2;
+  UNHEALTHY = 3;
+}
+
+// Circuit breaker state
+enum CircuitBreakerState {
+  CB_CLOSED = 0;        // Normal operation
+  CB_OPEN = 1;          // Blocking requests
+  CB_HALF_OPEN = 2;     // Testing recovery
+}
+
+// Decimal representation for precise financial calculations
+message Decimal {
+  string value = 1;     // String representation to avoid floating point errors
+}
+
+// Price with precision metadata
+message Price {
+  Decimal value = 1;
+  int32 precision = 2;  // Number of decimal places
+}
+
+// Quantity with precision metadata
+message Quantity {
+  Decimal value = 1;
+  int32 precision = 2;  // Number of decimal places
+}
+
+// Trading pair
+message TradingPair {
+  string symbol = 1;           // e.g., "BTCUSDT"
+  string base_asset = 2;       // e.g., "BTC"
+  string quote_asset = 3;      // e.g., "USDT"
+  Exchange exchange = 4;
+}
+
+// Error information
+message Error {
+  string code = 1;
+  string message = 2;
+  string details = 3;
+  Timestamp timestamp = 4;
+}
+
+// Request metadata
+message RequestMetadata {
+  string request_id = 1;       // UUID for tracing
+  Timestamp timestamp = 2;
+  string source_service = 3;
+  map<string, string> tags = 4;
+}
+
+// Response metadata
+message ResponseMetadata {
+  string request_id = 1;       // Echo from request
+  Timestamp timestamp = 2;
+  int64 processing_time_nanos = 3;
+  bool success = 4;
+  Error error = 5;
+}
+
+// Service identification
+message ServiceInfo {
+  string name = 1;
+  string version = 2;
+  string instance_id = 3;
+  Timestamp start_time = 4;
+  HealthStatus status = 5;
+}
+
+// Latency measurement
+message LatencyMetric {
+  string metric_name = 1;
+  int64 nanos = 2;
+  Timestamp timestamp = 3;
+}
