@@ -1,4 +1,6 @@
-# Build stage
+# Multi-stage build for Go Order Execution Service
+
+# Builder stage - compiles the application
 FROM golang:1.21-alpine AS builder
 
 # Install build dependencies
@@ -18,11 +20,37 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo \
     -ldflags '-extldflags "-static" -s -w' \
     -o order-execution ./cmd/server
 
-# Runtime stage
+# Development stage - includes dev tools and supports hot reload
+FROM golang:1.21-alpine AS development
+
+# Install development dependencies
+RUN apk add --no-cache git protobuf-dev make curl wget air
+
+WORKDIR /app
+
+# Copy go mod files
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Install air for hot reload (if not already installed)
+RUN go install github.com/cosmtrek/air@latest
+
+# Expose ports
+EXPOSE 50051 9091
+
+# Health check for development
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:9091/health/live || exit 1
+
+# Note: Source code should be mounted as volume in docker-compose
+# Development command with hot reload using air
+CMD ["air", "-c", ".air.toml"]
+
+# Production stage - minimal runtime image
 FROM alpine:latest
 
 # Install ca-certificates for HTTPS
-RUN apk --no-cache add ca-certificates tzdata
+RUN apk --no-cache add ca-certificates tzdata wget
 
 WORKDIR /app
 
@@ -40,7 +68,7 @@ USER appuser
 # Expose ports
 EXPOSE 50051 9091
 
-# Health check
+# Health check for production
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:9091/health/live || exit 1
 

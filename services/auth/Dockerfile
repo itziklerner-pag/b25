@@ -1,6 +1,6 @@
-# Multi-stage build for production-ready authentication service
+# Multi-stage build for Node.js Authentication Service
 
-# Stage 1: Build
+# Builder stage - compiles TypeScript
 FROM node:20-alpine AS builder
 
 WORKDIR /app
@@ -9,9 +9,8 @@ WORKDIR /app
 COPY package*.json ./
 COPY tsconfig.json ./
 
-# Install dependencies
-RUN npm ci --only=production && \
-    npm install -D typescript @types/node
+# Install all dependencies (including dev dependencies for building)
+RUN npm ci
 
 # Copy source code
 COPY src ./src
@@ -19,7 +18,36 @@ COPY src ./src
 # Build TypeScript
 RUN npm run build
 
-# Stage 2: Production
+# Development stage - includes dev tools and supports hot reload
+FROM node:20-alpine AS development
+
+# Set environment
+ENV NODE_ENV=development
+
+WORKDIR /app
+
+# Install development tools
+RUN apk add --no-cache curl
+
+# Copy package files
+COPY package*.json ./
+COPY tsconfig.json ./
+
+# Install all dependencies (including dev dependencies)
+RUN npm ci
+
+# Expose port
+EXPOSE 9097
+
+# Health check for development
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
+    CMD node -e "require('http').get('http://localhost:9097/health/live', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+
+# Note: Source code should be mounted as volume in docker-compose
+# Development command with hot reload using ts-node-dev or nodemon
+CMD ["npm", "run", "dev"]
+
+# Production stage - minimal runtime image
 FROM node:20-alpine
 
 # Set environment
@@ -49,7 +77,7 @@ USER nodejs
 # Expose port
 EXPOSE 9097
 
-# Health check
+# Health check for production
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
     CMD node -e "require('http').get('http://localhost:9097/health/live', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
