@@ -2,11 +2,11 @@
   "name": "@b25/auth-service",
   "version": "1.0.0",
   "description": "Authentication service for B25 HFT Trading System",
-  "main": "dist/server.js",
+  "type": "module",
+  "main": "src/server.js",
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/server.js",
-    "dev": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/server.ts",
+    "start": "node src/server.js",
+    "dev": "nodemon --watch 'src/**/*.js' src/server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": ["auth", "jwt", "authentication", "b25"],
@@ -24,14 +24,6 @@
     "pg": "^8.16.3"
   },
   "devDependencies": {
-    "@types/bcrypt": "^6.0.0",
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.3",
-    "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^24.6.2",
-    "@types/pg": "^8.15.5",
-    "nodemon": "^3.1.10",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.9.3"
+    "nodemon": "^3.1.10"
   }
 }

@@ -1,6 +1,6 @@
-# Multi-stage build for minimal production image
+# Multi-stage build for Go API Gateway
 
-# Build stage
+# Builder stage - compiles the application
 FROM golang:1.21-alpine AS builder
 
 # Install build dependencies
@@ -24,11 +24,37 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -o api-gateway \
     ./cmd/server
 
-# Production stage
+# Development stage - includes dev tools and supports hot reload
+FROM golang:1.21-alpine AS development
+
+# Install development dependencies
+RUN apk add --no-cache git ca-certificates curl wget
+
+# Install air for hot reload
+RUN go install github.com/cosmtrek/air@latest
+
+WORKDIR /app
+
+# Copy go mod files
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Expose port
+EXPOSE 8080
+
+# Health check for development
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+
+# Note: Source code should be mounted as volume in docker-compose
+# Development command with hot reload
+CMD ["air", "-c", ".air.toml"]
+
+# Production stage - minimal runtime image
 FROM alpine:latest
 
 # Install runtime dependencies
-RUN apk add --no-cache ca-certificates tzdata
+RUN apk add --no-cache ca-certificates tzdata wget
 
 # Create non-root user
 RUN addgroup -g 1000 gateway && \
@@ -52,7 +78,7 @@ USER gateway
 # Expose port
 EXPOSE 8080
 
-# Health check
+# Health check for production
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 

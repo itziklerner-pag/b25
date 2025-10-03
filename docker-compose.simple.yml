@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: b25-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - b25-network
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: b25-postgres
+    environment:
+      POSTGRES_DB: b25_config
+      POSTGRES_USER: b25
+      POSTGRES_PASSWORD: JDExqQGCJxncMuKrRwpAmg==
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - b25-network
+    restart: unless-stopped
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: b25-timescaledb
+    environment:
+      POSTGRES_DB: b25_timeseries
+      POSTGRES_USER: b25
+      POSTGRES_PASSWORD: L9JYNAeS3qdtqa6CrExpMA==
+    ports:
+      - "5433:5432"
+    volumes:
+      - timescaledb-data:/var/lib/postgresql/data
+    networks:
+      - b25-network
+    restart: unless-stopped
+
+  nats:
+    image: nats:latest
+    container_name: b25-nats
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    command: ["-js", "-m", "8222"]
+    networks:
+      - b25-network
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: b25-prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - b25-network
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: b25-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=BqDocPUqSRa8lffzfuleLw==
+    networks:
+      - b25-network
+    restart: unless-stopped
+
+networks:
+  b25-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  timescaledb-data:

@@ -17,7 +17,7 @@ b25/
 │   └── metrics/               # Prometheus/Grafana setup
 ├── ui/                 # User interfaces
 │   ├── terminal/              # Rust - Terminal UI (TUI)
-│   └── web/                   # React/TypeScript - Web dashboard
+│   └── web/                   # React/JavaScript - Web dashboard
 ├── shared/             # Shared code and schemas
 │   ├── proto/                 # Protobuf definitions
 │   ├── schemas/               # Data schemas
@@ -174,6 +174,18 @@ Pre-configured dashboards:
 - Credentials: Store in `.env` files (gitignored)
 - Production: Use Docker secrets or Kubernetes secrets
 - TLS: Required for all external connections
+
+## 📜 JavaScript-Only Policy
+
+**IMPORTANT:** This project follows a strict JavaScript-only policy:
+
+- All code must be written in pure JavaScript (ES6+)
+- No TypeScript syntax or type annotations allowed
+- Use JSDoc comments for type documentation when needed
+- No `.ts` or `.tsx` files in source code
+- Focus on clean, well-documented JavaScript
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
 ## 🤝 Contributing
 

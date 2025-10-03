@@ -2,6 +2,18 @@
 
 Production-ready authentication service for the B25 HFT Trading System. Provides secure user authentication using JWT tokens with refresh token rotation.
 
+## JavaScript-Only Policy
+
+**IMPORTANT:** This service follows a strict JavaScript-only policy:
+
+- All code must be written in pure JavaScript (ES6+)
+- NO TypeScript syntax or type annotations allowed
+- Use `.js` file extensions only (no `.ts` files)
+- Use JSDoc comments for type documentation when needed
+- Focus on clean, well-documented JavaScript code
+
+See the main [CONTRIBUTING.md](../../CONTRIBUTING.md) for detailed guidelines.
+
 ## Features
 
 - User registration with email/password
@@ -21,7 +33,7 @@ Production-ready authentication service for the B25 HFT Trading System. Provides
 ## Tech Stack
 
 - **Runtime**: Node.js 20
-- **Language**: TypeScript
+- **Language**: JavaScript (ES6+)
 - **Framework**: Express.js
 - **Database**: PostgreSQL
 - **Authentication**: JWT (jsonwebtoken)
@@ -227,7 +239,7 @@ The service will:
 ### Production Build
 
 ```bash
-# Build TypeScript
+# Build (if needed for any transpilation)
 npm run build
 
 # Start production server
