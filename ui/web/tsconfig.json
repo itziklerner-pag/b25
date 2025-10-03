@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 {
   "compilerOptions": {
     "target": "ES2020",
@@ -30,6 +29,3 @@
   "include": ["src"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
-=======
-{}
->>>>>>> refs/remotes/origin/main

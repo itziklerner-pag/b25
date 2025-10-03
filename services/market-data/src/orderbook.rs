@@ -1,5 +1,5 @@
 use ahash::AHashMap;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::BTreeMap;
 use std::sync::RwLock;
 use chrono::Utc;
@@ -34,6 +34,27 @@ impl Ord for OrderedFloat {
 impl From<f64> for OrderedFloat {
     fn from(f: f64) -> Self {
         OrderedFloat(f)
+    }
+}
+
+// Custom serialization for OrderedFloat
+impl Serialize for OrderedFloat {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_f64(self.0)
+    }
+}
+
+// Custom deserialization for OrderedFloat
+impl<'de> Deserialize<'de> for OrderedFloat {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let f = f64::deserialize(deserializer)?;
+        Ok(OrderedFloat(f))
     }
 }
 

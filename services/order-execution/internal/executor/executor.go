@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 	"go.uber.org/zap"
+	"github.com/sony/gobreaker"
 
 	"github.com/yourusername/b25/services/order-execution/internal/circuitbreaker"
 	"github.com/yourusername/b25/services/order-execution/internal/exchange"
@@ -72,7 +73,7 @@ func NewOrderExecutor(cfg Config, logger *zap.Logger) (*OrderExecutor, error) {
 
 	// Initialize circuit breaker
 	cbConfig := circuitbreaker.DefaultConfig()
-	cbConfig.OnStateChange = func(name string, from, to interface{}) {
+	cbConfig.OnStateChange = func(name string, from gobreaker.State, to gobreaker.State) {
 		logger.Warn("circuit breaker state change",
 			zap.String("name", name),
 			zap.Any("from", from),

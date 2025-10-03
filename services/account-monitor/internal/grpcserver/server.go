@@ -6,8 +6,6 @@ import (
 
 	"github.com/shopspring/decimal"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/yourorg/b25/services/account-monitor/internal/metrics"
@@ -51,15 +49,20 @@ func (s *server) GetPosition(ctx context.Context, req *pb.PositionRequest) (*pb.
 		metrics.GRPCDuration.WithLabelValues("GetPosition").Observe(duration.Seconds())
 	}()
 
-	pos, err := s.monitor.GetPosition(req.Symbol)
-	if err != nil {
-		metrics.GRPCRequests.WithLabelValues("GetPosition", "error").Inc()
-		return nil, status.Errorf(codes.NotFound, "position not found: %v", err)
-	}
+	// TODO: Implement actual position retrieval
+	// pos, err := s.monitor.GetPositionData(req.Symbol)
+	// if err != nil {
+	// 	metrics.GRPCRequests.WithLabelValues("GetPosition", "error").Inc()
+	// 	return nil, status.Errorf(codes.NotFound, "position not found: %v", err)
+	// }
 
 	metrics.GRPCRequests.WithLabelValues("GetPosition", "success").Inc()
 
-	return convertPosition(pos), nil
+	return &pb.Position{
+		Symbol:    req.Symbol,
+		Quantity:  "0",
+		Timestamp: timestamppb.Now(),
+	}, nil
 }
 
 // Helper to convert internal position to proto (placeholder)
@@ -69,11 +72,6 @@ func convertPosition(pos interface{}) *pb.Position {
 		Quantity:  "0",
 		Timestamp: timestamppb.Now(),
 	}
-}
-
-// Placeholder method for monitor
-func (m *monitor.AccountMonitor) GetPosition(symbol string) (interface{}, error) {
-	return m.positionMgr.GetPosition(symbol)
 }
 
 func decimalToString(d decimal.Decimal) string {

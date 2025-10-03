@@ -8,7 +8,7 @@ afterEach(() => {
 });
 
 // Mock WebSocket
-global.WebSocket = class WebSocket {
+globalThis.WebSocket = class WebSocket {
   CONNECTING = 0;
   OPEN = 1;
   CLOSING = 2;

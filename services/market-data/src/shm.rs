@@ -12,7 +12,7 @@ pub struct SharedMemoryRing {
 }
 
 impl SharedMemoryRing {
-    pub fn new(name: &str, capacity: usize) -> Result<Self> {
+    pub fn new(name: &str, _capacity: usize) -> Result<Self> {
         // For now, use in-memory queue
         // TODO: Replace with actual shared memory implementation using shared_memory crate
         let queue = Arc::new(ArrayQueue::new(1024)); // 1024 messages

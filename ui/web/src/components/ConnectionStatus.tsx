@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import { Wifi, WifiOff, AlertCircle, Activity } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTradingStore } from '@/store/trading';
-import type { ConnectionStatus as ConnectionStatusType } from '@/types';
 
 export function ConnectionStatus() {
   const status = useTradingStore((state) => state.status);

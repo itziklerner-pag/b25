@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useTradingStore } from '@/store/trading';
-import type { WebSocketMessage, ConnectionStatus } from '@/types';
+import type { WebSocketMessage } from '@/types';
 
 interface UseWebSocketOptions {
   url: string;
@@ -17,8 +17,8 @@ export function useWebSocket({
 }: UseWebSocketOptions) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttemptsRef = useRef(0);
-  const heartbeatRef = useRef<NodeJS.Timeout>();
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
+  const heartbeatRef = useRef<number>();
+  const reconnectTimeoutRef = useRef<number>();
 
   const setWs = useTradingStore((state) => state.setWs);
   const setStatus = useTradingStore((state) => state.setStatus);
@@ -134,7 +134,7 @@ export function useWebSocket({
         reconnectAttemptsRef.current = 0;
 
         // Start heartbeat
-        heartbeatRef.current = setInterval(sendHeartbeat, heartbeatInterval);
+        heartbeatRef.current = window.setInterval(sendHeartbeat, heartbeatInterval);
 
         // Subscribe to initial channels
         ws.send(
@@ -166,7 +166,7 @@ export function useWebSocket({
             `Reconnecting in ${delay}ms... (attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts})`
           );
 
-          reconnectTimeoutRef.current = setTimeout(() => {
+          reconnectTimeoutRef.current = window.setTimeout(() => {
             connect();
           }, delay);
         } else {

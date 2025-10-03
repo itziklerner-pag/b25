@@ -1,6 +1,6 @@
 use anyhow::{Result, Context};
 use futures_util::{SinkExt, StreamExt};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -117,7 +117,7 @@ impl WebSocketClient {
             .context("Failed to connect to WebSocket")?;
 
         info!("Connected to WebSocket for {}", self.symbol);
-        metrics::WS_CONNECTED.with_label_values(&[&self.symbol]).set(1);
+        metrics::WS_CONNECTED.with_label_values(&[&self.symbol]).set(1.0);
 
         let (mut write, mut read) = ws_stream.split();
 
@@ -167,7 +167,7 @@ impl WebSocketClient {
                 }
                 Message::Close(_) => {
                     info!("WebSocket closed for {}", self.symbol);
-                    metrics::WS_CONNECTED.with_label_values(&[&self.symbol]).set(0);
+                    metrics::WS_CONNECTED.with_label_values(&[&self.symbol]).set(0.0);
                     break;
                 }
                 _ => {}

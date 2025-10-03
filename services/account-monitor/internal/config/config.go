@@ -3,8 +3,10 @@ package config
 import (
 	"fmt"
 	"os"
+	"reflect"
 	"time"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/shopspring/decimal"
 	"github.com/spf13/viper"
 )
@@ -126,6 +128,34 @@ type LoggingConfig struct {
 	Output string `mapstructure:"output"`
 }
 
+// stringToDecimalHookFunc is a custom decode hook that converts strings to decimal.Decimal
+func stringToDecimalHookFunc() mapstructure.DecodeHookFunc {
+	return func(
+		f reflect.Type,
+		t reflect.Type,
+		data interface{},
+	) (interface{}, error) {
+		// Check if we're converting to decimal.Decimal
+		if t != reflect.TypeOf(decimal.Decimal{}) {
+			return data, nil
+		}
+
+		// Check if the source is a string
+		if f.Kind() != reflect.String {
+			return data, nil
+		}
+
+		// Convert string to decimal.Decimal
+		strVal := data.(string)
+		decVal, err := decimal.NewFromString(strVal)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse decimal from string '%s': %w", strVal, err)
+		}
+
+		return decVal, nil
+	}
+}
+
 // Load loads configuration from file and environment variables
 func Load() (*Config, error) {
 	if err := viper.ReadInConfig(); err != nil {
@@ -136,7 +166,24 @@ func Load() (*Config, error) {
 	}
 
 	var cfg Config
-	if err := viper.Unmarshal(&cfg); err != nil {
+
+	// Create decoder with custom decode hook for decimal.Decimal
+	decoderConfig := &mapstructure.DecoderConfig{
+		DecodeHook: mapstructure.ComposeDecodeHookFunc(
+			stringToDecimalHookFunc(),
+			mapstructure.StringToTimeDurationHookFunc(),
+			mapstructure.StringToSliceHookFunc(","),
+		),
+		Result:           &cfg,
+		WeaklyTypedInput: true,
+	}
+
+	decoder, err := mapstructure.NewDecoder(decoderConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create decoder: %w", err)
+	}
+
+	if err := decoder.Decode(viper.AllSettings()); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 

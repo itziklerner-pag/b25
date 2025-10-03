@@ -275,15 +275,15 @@ func (e *Engine) handleMarketData(data *strategies.MarketData) error {
 	startTime := time.Now()
 
 	e.strategyMu.RLock()
-	strategies := make([]strategies.Strategy, 0, len(e.activeStrategies))
+	strategyList := make([]strategies.Strategy, 0, len(e.activeStrategies))
 	for _, strategy := range e.activeStrategies {
-		strategies = append(strategies, strategy)
+		strategyList = append(strategyList, strategy)
 	}
 	e.strategyMu.RUnlock()
 
 	// Process market data in parallel for all strategies
 	var wg sync.WaitGroup
-	for _, strategy := range strategies {
+	for _, strategy := range strategyList {
 		wg.Add(1)
 		go func(s strategies.Strategy) {
 			defer wg.Done()

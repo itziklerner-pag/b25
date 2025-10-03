@@ -143,7 +143,7 @@ func (cb *CircuitBreaker) GetState(name string) gobreaker.State {
 // Reset resets a circuit breaker
 func (cb *CircuitBreaker) Reset(name string) {
 	cb.mu.RLock()
-	breaker, exists := cb.breakers[name]
+	_, exists := cb.breakers[name]
 	cb.mu.RUnlock()
 
 	if exists {

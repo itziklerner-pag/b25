@@ -2,7 +2,6 @@ package grpc
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/b25/services/risk-manager/internal/cache"

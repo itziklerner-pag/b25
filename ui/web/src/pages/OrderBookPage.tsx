@@ -38,7 +38,7 @@ export default function OrderBookPage() {
       xAxis: {
         type: 'category',
         data: allPrices,
-        axisLabel: { formatter: (value: number) => value.toFixed(2) },
+        axisLabel: { formatter: (value: string | number) => typeof value === 'number' ? value.toFixed(2) : value },
       },
       yAxis: {
         type: 'value',

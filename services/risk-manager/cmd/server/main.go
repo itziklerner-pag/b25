@@ -117,7 +117,7 @@ func main() {
 	stopManager := emergency.NewStopManager(logger, alertPublisher)
 
 	// Initialize metrics collector
-	metricsCollector := monitor.NewMetricsCollector()
+	_ = monitor.NewMetricsCollector()
 
 	// Initialize gRPC server
 	riskServer := grpc.NewRiskServer(

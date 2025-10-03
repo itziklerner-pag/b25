@@ -16,7 +16,7 @@ import { useWebSocket } from '@/hooks/useWebSocket';
 import { config } from '@/config/env';
 
 function App() {
-  const { status } = useWebSocket({
+  useWebSocket({
     url: config.websocketUrl,
     reconnectInterval: 3000,
     maxReconnectAttempts: 10,

@@ -1,5 +1,5 @@
 server:
-  port: 9095
+  port: 8083
   mode: development
   read_timeout: 10s
   write_timeout: 10s
@@ -8,9 +8,9 @@ server:
 database:
   host: localhost
   port: 5432
-  user: postgres
-  password: postgres
-  database: risk_manager
+  user: b25
+  password: JDExqQGCJxncMuKrRwpAmg==
+  database: b25_config
   ssl_mode: disable
   max_open_conns: 25
   max_idle_conns: 5
@@ -32,7 +32,7 @@ nats:
   emergency_topic: risk.emergency
 
 grpc:
-  port: 50051
+  port: 50052
   max_connection_idle: 5m
   max_connection_age: 30m
   keep_alive_interval: 30s
@@ -55,4 +55,4 @@ logging:
 
 metrics:
   enabled: true
-  port: 9095
+  port: 8083
