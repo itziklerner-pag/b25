@@ -1,0 +1,121 @@
+syntax = "proto3";
+
+package riskmanager;
+
+option go_package = "github.com/b25/services/risk-manager/proto";
+
+// Risk Manager Service - Pre-trade validation and risk monitoring
+service RiskManager {
+  // Pre-trade validation (must be fast: <10ms p99)
+  rpc CheckOrder(OrderRiskRequest) returns (OrderRiskResponse);
+
+  // Batch validation for multiple orders
+  rpc CheckOrderBatch(BatchOrderRiskRequest) returns (BatchOrderRiskResponse);
+
+  // Get current risk metrics
+  rpc GetRiskMetrics(RiskMetricsRequest) returns (RiskMetricsResponse);
+
+  // Emergency stop trigger
+  rpc TriggerEmergencyStop(EmergencyStopRequest) returns (EmergencyStopResponse);
+
+  // Get emergency stop status
+  rpc GetEmergencyStopStatus(EmergencyStopStatusRequest) returns (EmergencyStopStatusResponse);
+
+  // Re-enable trading after emergency stop
+  rpc ReEnableTrading(ReEnableTradingRequest) returns (ReEnableTradingResponse);
+}
+
+message OrderRiskRequest {
+  string order_id = 1;
+  string symbol = 2;
+  string side = 3;        // BUY or SELL
+  double quantity = 4;
+  double price = 5;       // 0 for market orders
+  string order_type = 6;  // MARKET, LIMIT
+  string strategy_id = 7;
+  string account_id = 8;
+  int64 timestamp = 9;
+}
+
+message OrderRiskResponse {
+  bool approved = 1;
+  repeated string violations = 2;  // Empty if approved
+  RiskMetrics post_trade_metrics = 3;
+  int64 processing_time_us = 4;
+  string rejection_reason = 5;
+}
+
+message BatchOrderRiskRequest {
+  repeated OrderRiskRequest orders = 1;
+}
+
+message BatchOrderRiskResponse {
+  repeated OrderRiskResponse responses = 1;
+  int64 total_processing_time_us = 2;
+}
+
+message RiskMetricsRequest {
+  string account_id = 1;
+}
+
+message RiskMetricsResponse {
+  RiskMetrics metrics = 1;
+  int64 timestamp = 2;
+}
+
+message RiskMetrics {
+  double margin_ratio = 1;
+  double leverage = 2;
+  double drawdown_daily = 3;
+  double drawdown_max = 4;
+  double daily_pnl = 5;
+  double unrealized_pnl = 6;
+  double total_equity = 7;
+  double total_margin_used = 8;
+  map<string, double> position_concentration = 9;  // symbol -> concentration %
+  map<string, double> limit_utilization = 10;      // limit_name -> utilization %
+  int32 open_positions = 11;
+  int32 pending_orders = 12;
+}
+
+message EmergencyStopRequest {
+  string reason = 1;
+  string triggered_by = 2;
+  bool force = 3;  // Force stop even if already stopped
+}
+
+message EmergencyStopResponse {
+  bool success = 1;
+  string message = 2;
+  EmergencyStopStatus status = 3;
+}
+
+message EmergencyStopStatusRequest {
+  // Empty - get current status
+}
+
+message EmergencyStopStatusResponse {
+  EmergencyStopStatus status = 1;
+}
+
+message EmergencyStopStatus {
+  bool is_stopped = 1;
+  int64 stopped_at = 2;
+  string stop_reason = 3;
+  string triggered_by = 4;
+  int32 orders_canceled = 5;
+  int32 positions_closed = 6;
+  bool completed = 7;
+  int64 completed_at = 8;
+}
+
+message ReEnableTradingRequest {
+  string authorized_by = 1;
+  string reason = 2;
+}
+
+message ReEnableTradingResponse {
+  bool success = 1;
+  string message = 2;
+  int64 re_enabled_at = 3;
+}

@@ -1,0 +1,29 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'risk-manager-local'
+    environment: 'development'
+
+scrape_configs:
+  - job_name: 'risk-manager'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['risk-manager:9095']
+        labels:
+          service: 'risk-manager'
+          tier: 'core'
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+# Alerting rules
+rule_files:
+  # - 'alerts.yml'
+
+# Alert manager configuration (optional)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ['alertmanager:9093']

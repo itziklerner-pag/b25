@@ -1,0 +1,211 @@
+syntax = "proto3";
+
+package b25.account;
+
+import "common.proto";
+
+option go_package = "github.com/b25/shared/proto/gen/go/account";
+
+// Account balance
+message Balance {
+  string asset = 1;               // e.g., "USDT", "BTC"
+  b25.common.Decimal total = 2;   // Total balance
+  b25.common.Decimal free = 3;    // Available balance (not in orders)
+  b25.common.Decimal locked = 4;  // Locked in orders
+  b25.common.Timestamp timestamp = 5;
+}
+
+// Position
+message Position {
+  b25.common.TradingPair pair = 1;
+  b25.common.Side side = 2;       // LONG (BUY) or SHORT (SELL)
+  b25.common.Quantity quantity = 3;
+  b25.common.Price entry_price = 4;     // Average entry price
+  b25.common.Price mark_price = 5;      // Current mark price
+  b25.common.Price liquidation_price = 6;
+
+  b25.common.Decimal unrealized_pnl = 7;
+  b25.common.Decimal realized_pnl = 8;
+  b25.common.Decimal leverage = 9;
+  b25.common.Decimal margin = 10;       // Initial margin
+  b25.common.Decimal notional_value = 11;
+
+  b25.common.Timestamp opened_at = 12;
+  b25.common.Timestamp updated_at = 13;
+
+  string strategy_id = 14;
+  map<string, string> tags = 15;
+}
+
+// Complete account state
+message AccountState {
+  b25.common.Exchange exchange = 1;
+  repeated Balance balances = 2;
+  repeated Position positions = 3;
+
+  // Account-level metrics
+  b25.common.Decimal total_equity = 4;           // In quote currency (e.g., USDT)
+  b25.common.Decimal available_balance = 5;
+  b25.common.Decimal total_margin = 6;
+  b25.common.Decimal margin_ratio = 7;           // Margin / Equity
+  b25.common.Decimal total_unrealized_pnl = 8;
+  b25.common.Decimal total_realized_pnl = 9;
+
+  // Daily metrics
+  b25.common.Decimal daily_pnl = 10;
+  b25.common.Decimal daily_volume = 11;
+  b25.common.Decimal daily_commission = 12;
+
+  b25.common.Timestamp timestamp = 13;
+  int64 sequence = 14;            // For ordering updates
+}
+
+// Account update event
+message AccountUpdate {
+  AccountUpdateType update_type = 1;
+  AccountState state = 2;
+  repeated Balance balance_changes = 3;
+  repeated Position position_changes = 4;
+  b25.common.Timestamp timestamp = 5;
+}
+
+enum AccountUpdateType {
+  ACCOUNT_UPDATE_UNSPECIFIED = 0;
+  BALANCE_UPDATE = 1;
+  POSITION_UPDATE = 2;
+  MARGIN_CALL = 3;
+  LIQUIDATION = 4;
+  FULL_SNAPSHOT = 5;
+}
+
+// Query account request
+message QueryAccountRequest {
+  b25.common.RequestMetadata metadata = 1;
+  b25.common.Exchange exchange = 2;
+}
+
+// Query account response
+message QueryAccountResponse {
+  b25.common.ResponseMetadata metadata = 1;
+  AccountState state = 2;
+}
+
+// Query positions request
+message QueryPositionsRequest {
+  b25.common.RequestMetadata metadata = 1;
+  b25.common.Exchange exchange = 2;
+  b25.common.TradingPair pair = 3;  // Optional filter
+}
+
+// Query positions response
+message QueryPositionsResponse {
+  b25.common.ResponseMetadata metadata = 1;
+  repeated Position positions = 2;
+}
+
+// PnL calculation
+message PnLCalculation {
+  b25.common.TradingPair pair = 1;
+  b25.common.Decimal realized_pnl = 2;
+  b25.common.Decimal unrealized_pnl = 3;
+  b25.common.Decimal total_pnl = 4;
+  b25.common.Decimal return_pct = 5;            // % return
+  b25.common.Decimal commission_paid = 6;
+  b25.common.Timestamp period_start = 7;
+  b25.common.Timestamp period_end = 8;
+}
+
+// Performance metrics
+message PerformanceMetrics {
+  // Overall metrics
+  b25.common.Decimal total_pnl = 1;
+  b25.common.Decimal total_return_pct = 2;
+  b25.common.Decimal sharpe_ratio = 3;
+  b25.common.Decimal max_drawdown_pct = 4;
+  b25.common.Decimal win_rate = 5;              // % of profitable trades
+
+  // Trade statistics
+  int64 total_trades = 6;
+  int64 winning_trades = 7;
+  int64 losing_trades = 8;
+  b25.common.Decimal avg_win = 9;
+  b25.common.Decimal avg_loss = 10;
+  b25.common.Decimal profit_factor = 11;        // Gross profit / Gross loss
+
+  // Fee analysis
+  b25.common.Decimal total_commission = 12;
+  b25.common.Decimal maker_commission = 13;
+  b25.common.Decimal taker_commission = 14;
+  b25.common.Decimal maker_volume_pct = 15;
+
+  // Time period
+  b25.common.Timestamp period_start = 16;
+  b25.common.Timestamp period_end = 17;
+}
+
+// Risk metrics
+message RiskMetrics {
+  b25.common.TradingPair pair = 1;  // Optional, for per-symbol metrics
+
+  b25.common.Decimal position_size = 2;
+  b25.common.Decimal position_limit = 3;
+  b25.common.Decimal position_utilization = 4;  // position / limit
+
+  b25.common.Decimal leverage = 5;
+  b25.common.Decimal max_leverage = 6;
+
+  b25.common.Decimal margin_ratio = 7;
+  b25.common.Decimal margin_threshold = 8;
+
+  b25.common.Decimal daily_pnl = 9;
+  b25.common.Decimal daily_drawdown_limit = 10;
+  b25.common.Decimal daily_drawdown_pct = 11;
+
+  bool margin_call_risk = 12;
+  bool drawdown_limit_breached = 13;
+
+  b25.common.Timestamp timestamp = 14;
+}
+
+// Reconciliation result
+message ReconciliationResult {
+  b25.common.Exchange exchange = 1;
+  bool positions_match = 2;
+  bool balances_match = 3;
+
+  repeated PositionMismatch position_mismatches = 4;
+  repeated BalanceMismatch balance_mismatches = 5;
+
+  b25.common.Timestamp local_timestamp = 6;
+  b25.common.Timestamp exchange_timestamp = 7;
+}
+
+message PositionMismatch {
+  b25.common.TradingPair pair = 1;
+  Position local_position = 2;
+  Position exchange_position = 3;
+  b25.common.Decimal difference = 4;
+}
+
+message BalanceMismatch {
+  string asset = 1;
+  Balance local_balance = 2;
+  Balance exchange_balance = 3;
+  b25.common.Decimal difference = 4;
+}
+
+// Transfer request (internal balance transfer)
+message TransferRequest {
+  b25.common.RequestMetadata metadata = 1;
+  string asset = 2;
+  b25.common.Decimal amount = 3;
+  string from_account = 4;
+  string to_account = 5;
+}
+
+// Transfer response
+message TransferResponse {
+  b25.common.ResponseMetadata metadata = 1;
+  string transfer_id = 2;
+  bool success = 3;
+}

@@ -1,0 +1,27 @@
+# Market Data Service Configuration
+
+# Symbols to subscribe to
+symbols:
+  - BTCUSDT
+  - ETHUSDT
+  - BNBUSDT
+  - SOLUSDT
+
+# Exchange WebSocket URL (Binance Futures)
+exchange_ws_url: "wss://fstream.binance.com/stream"
+
+# Redis connection for pub/sub
+redis_url: "redis://127.0.0.1:6379"
+
+# Order book depth to maintain
+order_book_depth: 20
+
+# Health check and metrics HTTP port
+health_port: 9090
+
+# Shared memory name for local IPC
+shm_name: "market_data_shm"
+
+# Reconnection settings
+reconnect_delay_ms: 1000
+max_reconnect_delay_ms: 60000

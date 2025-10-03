@@ -1,0 +1,197 @@
+syntax = "proto3";
+
+package b25.orders;
+
+import "common.proto";
+
+option go_package = "github.com/b25/shared/proto/gen/go/orders";
+
+// Order request from strategy to execution engine
+message OrderRequest {
+  b25.common.RequestMetadata metadata = 1;
+  string client_order_id = 2;     // Client-generated unique ID
+  b25.common.TradingPair pair = 3;
+  b25.common.Side side = 4;
+  b25.common.OrderType type = 5;
+  b25.common.TimeInForce time_in_force = 6;
+  b25.common.Price price = 7;     // Optional for market orders
+  b25.common.Quantity quantity = 8;
+  b25.common.Price stop_price = 9;  // For stop orders
+
+  // Optional parameters
+  bool reduce_only = 10;          // Only reduce position
+  bool post_only = 11;            // Maker only (POST_ONLY TIF)
+  string strategy_id = 12;        // Originating strategy
+  map<string, string> tags = 13;  // Additional metadata
+}
+
+// Order response from execution engine
+message OrderResponse {
+  b25.common.ResponseMetadata metadata = 1;
+  string client_order_id = 2;
+  string exchange_order_id = 3;   // Exchange-assigned ID
+  b25.common.OrderStatus status = 4;
+  b25.common.Timestamp submitted_at = 5;
+}
+
+// Complete order state
+message Order {
+  string client_order_id = 1;
+  string exchange_order_id = 2;
+  b25.common.TradingPair pair = 3;
+  b25.common.Side side = 4;
+  b25.common.OrderType type = 5;
+  b25.common.TimeInForce time_in_force = 6;
+  b25.common.OrderStatus status = 7;
+
+  b25.common.Price price = 8;
+  b25.common.Quantity quantity = 9;
+  b25.common.Quantity filled_quantity = 10;
+  b25.common.Quantity remaining_quantity = 11;
+
+  b25.common.Decimal avg_fill_price = 12;
+  b25.common.Decimal commission = 13;
+  string commission_asset = 14;
+
+  bool reduce_only = 15;
+  bool post_only = 16;
+  string strategy_id = 17;
+
+  b25.common.Timestamp created_at = 18;
+  b25.common.Timestamp submitted_at = 19;
+  b25.common.Timestamp updated_at = 20;
+  b25.common.Timestamp completed_at = 21;
+
+  string reject_reason = 22;      // If status is REJECTED
+  map<string, string> tags = 23;
+}
+
+// Order update event
+message OrderUpdate {
+  Order order = 1;
+  OrderUpdateType update_type = 2;
+  b25.common.Timestamp timestamp = 3;
+  int64 sequence = 4;
+}
+
+enum OrderUpdateType {
+  UPDATE_TYPE_UNSPECIFIED = 0;
+  CREATED = 1;
+  SUBMITTED = 2;
+  ACKNOWLEDGED = 3;
+  PARTIALLY_FILLED = 4;
+  FILLED = 5;
+  CANCELED = 6;
+  REJECTED = 7;
+  EXPIRED = 8;
+}
+
+// Fill event
+message Fill {
+  string fill_id = 1;             // Unique fill ID
+  string trade_id = 2;            // Exchange trade ID
+  string client_order_id = 3;
+  string exchange_order_id = 4;
+  b25.common.TradingPair pair = 5;
+  b25.common.Side side = 6;
+
+  b25.common.Price price = 7;
+  b25.common.Quantity quantity = 8;
+  b25.common.Decimal commission = 9;
+  string commission_asset = 10;
+
+  bool is_maker = 11;             // True if maker, false if taker
+  b25.common.Decimal realized_pnl = 12;  // If closing a position
+
+  b25.common.Timestamp exchange_time = 13;
+  b25.common.Timestamp received_time = 14;
+
+  string strategy_id = 15;
+  map<string, string> tags = 16;
+}
+
+// Cancel order request
+message CancelOrderRequest {
+  b25.common.RequestMetadata metadata = 1;
+  string client_order_id = 2;
+  string exchange_order_id = 3;  // Optional, either client or exchange ID
+  b25.common.TradingPair pair = 4;
+}
+
+// Cancel order response
+message CancelOrderResponse {
+  b25.common.ResponseMetadata metadata = 1;
+  string client_order_id = 2;
+  string exchange_order_id = 3;
+  bool canceled = 4;
+}
+
+// Cancel all orders request
+message CancelAllOrdersRequest {
+  b25.common.RequestMetadata metadata = 1;
+  b25.common.TradingPair pair = 2;  // Optional, cancel for specific pair
+}
+
+// Cancel all orders response
+message CancelAllOrdersResponse {
+  b25.common.ResponseMetadata metadata = 1;
+  int32 canceled_count = 2;
+  repeated string canceled_order_ids = 3;
+}
+
+// Query orders request
+message QueryOrdersRequest {
+  b25.common.RequestMetadata metadata = 1;
+  b25.common.TradingPair pair = 2;  // Optional filter
+  b25.common.OrderStatus status = 3; // Optional filter
+  string strategy_id = 4;           // Optional filter
+  int32 limit = 5;                  // Max results
+}
+
+// Query orders response
+message QueryOrdersResponse {
+  b25.common.ResponseMetadata metadata = 1;
+  repeated Order orders = 2;
+  int32 total_count = 3;
+}
+
+// Order validation result
+message ValidationResult {
+  bool valid = 1;
+  repeated ValidationError errors = 2;
+  repeated ValidationWarning warnings = 3;
+}
+
+message ValidationError {
+  string code = 1;
+  string message = 2;
+  string field = 3;
+}
+
+message ValidationWarning {
+  string code = 1;
+  string message = 2;
+}
+
+// Rate limiter status
+message RateLimiterStatus {
+  string name = 1;
+  int32 limit = 2;              // Max requests per window
+  int32 remaining = 3;          // Remaining in current window
+  b25.common.Timestamp reset_at = 4;
+  int64 window_ms = 5;          // Window duration in milliseconds
+}
+
+// Order metrics
+message OrderMetrics {
+  b25.common.TradingPair pair = 1;
+  int64 total_orders = 2;
+  int64 filled_orders = 3;
+  int64 canceled_orders = 4;
+  int64 rejected_orders = 5;
+  b25.common.Decimal fill_rate = 6;
+  b25.common.Decimal maker_fill_rate = 7;
+  b25.common.Decimal avg_fill_latency_ms = 8;
+  b25.common.Timestamp period_start = 9;
+  b25.common.Timestamp period_end = 10;
+}

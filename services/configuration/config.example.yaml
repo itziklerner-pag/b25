@@ -1,0 +1,31 @@
+# Configuration Service Configuration
+
+server:
+  host: 0.0.0.0
+  http_port: 9096
+  grpc_port: 9097
+
+database:
+  host: localhost
+  port: 5432
+  user: postgres
+  password: postgres
+  dbname: configuration_db
+  sslmode: disable
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: 5m
+
+nats:
+  url: nats://localhost:4222
+  config_topic: config.updates
+  reconnect_wait: 2s
+  max_reconnects: 10
+
+log:
+  level: info  # debug, info, warn, error
+  format: json  # json, console
+
+metrics:
+  enabled: true
+  path: /metrics

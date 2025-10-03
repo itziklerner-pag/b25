@@ -1,0 +1,7 @@
+target/
+**/*.rs.bk
+.git/
+.gitignore
+*.md
+config.yaml
+.env

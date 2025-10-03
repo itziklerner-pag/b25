@@ -1,0 +1,19 @@
+version: v1
+managed:
+  enabled: true
+plugins:
+  # Go generation
+  - plugin: buf.build/protocolbuffers/go
+    out: gen/go
+    opt:
+      - paths=source_relative
+  - plugin: buf.build/grpc/go
+    out: gen/go
+    opt:
+      - paths=source_relative
+
+  # Rust generation
+  - plugin: buf.build/community/neoeinstein-prost
+    out: gen/rust
+  - plugin: buf.build/community/neoeinstein-tonic
+    out: gen/rust

@@ -1,0 +1,149 @@
+syntax = "proto3";
+
+package order;
+
+option go_package = "github.com/yourusername/b25/services/order-execution/proto";
+
+// OrderService handles order lifecycle management
+service OrderService {
+  rpc CreateOrder(CreateOrderRequest) returns (CreateOrderResponse);
+  rpc CancelOrder(CancelOrderRequest) returns (CancelOrderResponse);
+  rpc GetOrder(GetOrderRequest) returns (GetOrderResponse);
+  rpc GetOrders(GetOrdersRequest) returns (GetOrdersResponse);
+  rpc StreamOrderUpdates(StreamOrderUpdatesRequest) returns (stream OrderUpdate);
+}
+
+enum OrderSide {
+  SIDE_UNSPECIFIED = 0;
+  BUY = 1;
+  SELL = 2;
+}
+
+enum OrderType {
+  TYPE_UNSPECIFIED = 0;
+  MARKET = 1;
+  LIMIT = 2;
+  STOP_MARKET = 3;
+  STOP_LIMIT = 4;
+  POST_ONLY = 5;  // Maker-only limit order
+}
+
+enum OrderState {
+  STATE_UNSPECIFIED = 0;
+  NEW = 1;           // Order created, not yet submitted
+  SUBMITTED = 2;     // Sent to exchange
+  PARTIALLY_FILLED = 3;
+  FILLED = 4;
+  CANCELED = 5;
+  REJECTED = 6;
+  EXPIRED = 7;
+}
+
+enum TimeInForce {
+  TIF_UNSPECIFIED = 0;
+  GTC = 1;  // Good Till Cancel
+  IOC = 2;  // Immediate or Cancel
+  FOK = 3;  // Fill or Kill
+  GTX = 4;  // Good Till Crossing (Post-only)
+}
+
+message CreateOrderRequest {
+  string symbol = 1;          // e.g., "BTCUSDT"
+  OrderSide side = 2;
+  OrderType type = 3;
+  double quantity = 4;
+  double price = 5;           // Optional for MARKET orders
+  double stop_price = 6;      // For STOP orders
+  TimeInForce time_in_force = 7;
+  string client_order_id = 8; // Optional client-side ID
+  bool reduce_only = 9;       // Futures only
+  bool post_only = 10;        // Force maker order
+  string user_id = 11;        // User placing the order
+}
+
+message CreateOrderResponse {
+  string order_id = 1;
+  string client_order_id = 2;
+  OrderState state = 3;
+  int64 timestamp = 4;
+  string error_message = 5;
+}
+
+message CancelOrderRequest {
+  string order_id = 1;
+  string symbol = 2;
+}
+
+message CancelOrderResponse {
+  string order_id = 1;
+  OrderState state = 2;
+  int64 timestamp = 3;
+  string error_message = 4;
+}
+
+message GetOrderRequest {
+  string order_id = 1;
+}
+
+message GetOrderResponse {
+  Order order = 1;
+}
+
+message GetOrdersRequest {
+  string symbol = 1;         // Optional filter
+  OrderState state = 2;      // Optional filter
+  int64 start_time = 3;      // Optional filter
+  int64 end_time = 4;        // Optional filter
+  int32 limit = 5;           // Max results
+}
+
+message GetOrdersResponse {
+  repeated Order orders = 1;
+}
+
+message StreamOrderUpdatesRequest {
+  string user_id = 1;
+  repeated string symbols = 2; // Optional filter
+}
+
+message Order {
+  string order_id = 1;
+  string client_order_id = 2;
+  string symbol = 3;
+  OrderSide side = 4;
+  OrderType type = 5;
+  OrderState state = 6;
+  TimeInForce time_in_force = 7;
+  double quantity = 8;
+  double price = 9;
+  double stop_price = 10;
+  double filled_quantity = 11;
+  double average_price = 12;
+  double fee = 13;
+  string fee_asset = 14;
+  int64 created_at = 15;
+  int64 updated_at = 16;
+  string user_id = 17;
+  bool reduce_only = 18;
+  bool post_only = 19;
+  string exchange_order_id = 20;
+}
+
+message OrderUpdate {
+  Order order = 1;
+  string update_type = 2;  // CREATED, UPDATED, FILLED, CANCELED, REJECTED
+  int64 timestamp = 3;
+}
+
+message Fill {
+  string fill_id = 1;
+  string order_id = 2;
+  string symbol = 3;
+  OrderSide side = 4;
+  double price = 5;
+  double quantity = 6;
+  double fee = 7;
+  string fee_asset = 8;
+  int64 timestamp = 9;
+  bool is_maker = 10;
+}

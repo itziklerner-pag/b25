@@ -1,0 +1,122 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: risk-manager-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: risk_manager
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: risk-manager-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nats:
+    image: nats:latest
+    container_name: risk-manager-nats
+    command: "-js -m 8222"
+    ports:
+      - "4222:4222"   # Client connections
+      - "8222:8222"   # HTTP monitoring
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8222/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  migrate:
+    image: migrate/migrate
+    container_name: risk-manager-migrate
+    volumes:
+      - ./migrations:/migrations
+    command: >
+      -path=/migrations
+      -database postgres://postgres:postgres@postgres:5432/risk_manager?sslmode=disable
+      up
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  risk-manager:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: risk-manager-service
+    environment:
+      RISK_DATABASE_HOST: postgres
+      RISK_DATABASE_PORT: 5432
+      RISK_DATABASE_USER: postgres
+      RISK_DATABASE_PASSWORD: postgres
+      RISK_DATABASE_DATABASE: risk_manager
+      RISK_REDIS_HOST: redis
+      RISK_REDIS_PORT: 6379
+      RISK_NATS_URL: nats://nats:4222
+      RISK_LOGGING_LEVEL: debug
+      RISK_LOGGING_FORMAT: console
+    ports:
+      - "50051:50051"  # gRPC
+      - "9095:9095"    # Metrics + Health
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: risk-manager-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - risk-manager
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: risk-manager-grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:

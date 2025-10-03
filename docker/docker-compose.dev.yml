@@ -2,6 +2,7 @@ version: '3.8'
 
 # Development Docker Compose Configuration
 # Start all services: docker-compose -f docker/docker-compose.dev.yml up
+# Start specific services: docker-compose -f docker/docker-compose.dev.yml up redis postgres market-data
 
 services:
   # ============================================
@@ -21,8 +22,10 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+      start_period: 5s
     networks:
       - b25-network
+    restart: unless-stopped
 
   postgres:
     image: postgres:15-alpine
@@ -35,13 +38,16 @@ services:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - ../scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U b25"]
       interval: 5s
       timeout: 3s
       retries: 5
+      start_period: 10s
     networks:
       - b25-network
+    restart: unless-stopped
 
   timescaledb:
     image: timescale/timescaledb:latest-pg15
@@ -59,23 +65,30 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+      start_period: 10s
     networks:
       - b25-network
+    restart: unless-stopped
 
   nats:
     image: nats:latest
     container_name: b25-nats
     ports:
-      - "4222:4222"
-      - "8222:8222"
-    command: ["-js", "-m", "8222"]
+      - "4222:4222"  # Client connections
+      - "8222:8222"  # HTTP monitoring
+      - "6222:6222"  # Cluster connections
+    command: ["-js", "-m", "8222", "--store_dir", "/data"]
+    volumes:
+      - nats-data:/data
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8222/healthz"]
       interval: 5s
       timeout: 3s
       retries: 5
+      start_period: 5s
     networks:
       - b25-network
+    restart: unless-stopped
 
   # ============================================
   # Observability Services
@@ -93,8 +106,10 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
     networks:
       - b25-network
+    restart: unless-stopped
 
   grafana:
     image: grafana/grafana:latest
@@ -104,13 +119,16 @@ services:
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=redis-datasource
     volumes:
       - ../services/metrics/grafana/provisioning:/etc/grafana/provisioning
       - grafana-data:/var/lib/grafana
     depends_on:
-      - prometheus
+      prometheus:
+        condition: service_started
     networks:
       - b25-network
+    restart: unless-stopped
 
   alertmanager:
     image: prom/alertmanager:latest
@@ -119,107 +137,409 @@ services:
       - "9093:9093"
     volumes:
       - ../services/metrics/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - alertmanager-data:/alertmanager
     command:
       - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
     networks:
       - b25-network
+    restart: unless-stopped
 
   # ============================================
-  # Trading System Services (uncomment when ready)
+  # Core Trading Services
   # ============================================
 
-  # market-data:
-  #   build:
-  #     context: ../services/market-data
-  #     dockerfile: Dockerfile
-  #   container_name: b25-market-data
-  #   environment:
-  #     - RUST_LOG=info
-  #     - REDIS_URL=redis://redis:6379
-  #   ports:
-  #     - "9090:9090"
-  #   depends_on:
-  #     - redis
-  #   networks:
-  #     - b25-network
+  market-data:
+    build:
+      context: ../services/market-data
+      dockerfile: Dockerfile
+      target: development
+    container_name: b25-market-data
+    environment:
+      - RUST_LOG=info,market_data=debug
+      - RUST_BACKTRACE=1
+      - REDIS_URL=redis://redis:6379
+      - NATS_URL=nats://nats:4222
+      - METRICS_PORT=9100
+      - GRPC_PORT=50051
+      - HTTP_PORT=8080
+    ports:
+      - "50051:50051"  # gRPC
+      - "8080:8080"    # HTTP API
+      - "9100:9100"    # Metrics
+    volumes:
+      - ../services/market-data/config:/app/config
+    depends_on:
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks:
+      - b25-network
+    restart: unless-stopped
 
-  # order-execution:
-  #   build:
-  #     context: ../services/order-execution
-  #     dockerfile: Dockerfile
-  #   container_name: b25-order-execution
-  #   environment:
-  #     - REDIS_URL=redis://redis:6379
-  #     - NATS_URL=nats://nats:4222
-  #   ports:
-  #     - "9091:9091"
-  #   depends_on:
-  #     - redis
-  #     - nats
-  #   networks:
-  #     - b25-network
+  order-execution:
+    build:
+      context: ../services/order-execution
+      dockerfile: Dockerfile
+      target: development
+    container_name: b25-order-execution
+    environment:
+      - LOG_LEVEL=debug
+      - REDIS_URL=redis://redis:6379
+      - NATS_URL=nats://nats:4222
+      - POSTGRES_URL=postgres://b25:dev_password@postgres:5432/b25_config?sslmode=disable
+      - GRPC_PORT=50052
+      - HTTP_PORT=8081
+      - METRICS_PORT=9101
+    ports:
+      - "50052:50052"  # gRPC
+      - "8081:8081"    # HTTP API
+      - "9101:9101"    # Metrics
+    volumes:
+      - ../services/order-execution/config:/app/config
+    depends_on:
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      market-data:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+    networks:
+      - b25-network
+    restart: unless-stopped
 
-  # strategy-engine:
-  #   build:
-  #     context: ../services/strategy-engine
-  #     dockerfile: Dockerfile
-  #   container_name: b25-strategy-engine
-  #   environment:
-  #     - NATS_URL=nats://nats:4222
-  #   ports:
-  #     - "9092:9092"
-  #   depends_on:
-  #     - nats
-  #   networks:
-  #     - b25-network
+  strategy-engine:
+    build:
+      context: ../services/strategy-engine
+      dockerfile: Dockerfile
+      target: development
+    container_name: b25-strategy-engine
+    environment:
+      - LOG_LEVEL=debug
+      - NATS_URL=nats://nats:4222
+      - REDIS_URL=redis://redis:6379
+      - POSTGRES_URL=postgres://b25:dev_password@postgres:5432/b25_config?sslmode=disable
+      - GRPC_PORT=50053
+      - HTTP_PORT=8082
+      - METRICS_PORT=9102
+      - PYTHON_PATH=/app/strategies
+    ports:
+      - "50053:50053"  # gRPC
+      - "8082:8082"    # HTTP API
+      - "9102:9102"    # Metrics
+    volumes:
+      - ../services/strategy-engine/config:/app/config
+      - ../services/strategy-engine/strategies:/app/strategies
+    depends_on:
+      nats:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      market-data:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+    networks:
+      - b25-network
+    restart: unless-stopped
 
-  # account-monitor:
-  #   build:
-  #     context: ../services/account-monitor
-  #     dockerfile: Dockerfile
-  #   container_name: b25-account-monitor
-  #   environment:
-  #     - TIMESCALEDB_URL=postgres://b25:dev_password@timescaledb:5432/b25_timeseries
-  #     - REDIS_URL=redis://redis:6379
-  #   ports:
-  #     - "9093:9093"
-  #   depends_on:
-  #     - timescaledb
-  #     - redis
-  #   networks:
-  #     - b25-network
+  risk-manager:
+    build:
+      context: ../services/risk-manager
+      dockerfile: Dockerfile
+      target: development
+    container_name: b25-risk-manager
+    environment:
+      - LOG_LEVEL=debug
+      - REDIS_URL=redis://redis:6379
+      - NATS_URL=nats://nats:4222
+      - POSTGRES_URL=postgres://b25:dev_password@postgres:5432/b25_config?sslmode=disable
+      - GRPC_PORT=50054
+      - HTTP_PORT=8083
+      - METRICS_PORT=9103
+    ports:
+      - "50054:50054"  # gRPC
+      - "8083:8083"    # HTTP API
+      - "9103:9103"    # Metrics
+    volumes:
+      - ../services/risk-manager/config:/app/config
+      - ../services/risk-manager/plugins:/app/plugins
+    depends_on:
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      order-execution:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+    networks:
+      - b25-network
+    restart: unless-stopped
 
-  # dashboard-server:
-  #   build:
-  #     context: ../services/dashboard-server
-  #     dockerfile: Dockerfile
-  #   container_name: b25-dashboard-server
-  #   ports:
-  #     - "8080:8080"
-  #   depends_on:
-  #     - redis
-  #   networks:
-  #     - b25-network
+  account-monitor:
+    build:
+      context: ../services/account-monitor
+      dockerfile: Dockerfile
+      target: development
+    container_name: b25-account-monitor
+    environment:
+      - LOG_LEVEL=debug
+      - TIMESCALEDB_URL=postgres://b25:dev_password@timescaledb:5432/b25_timeseries?sslmode=disable
+      - REDIS_URL=redis://redis:6379
+      - NATS_URL=nats://nats:4222
+      - GRPC_PORT=50055
+      - HTTP_PORT=8084
+      - METRICS_PORT=9104
+    ports:
+      - "50055:50055"  # gRPC
+      - "8084:8084"    # HTTP API
+      - "9104:9104"    # Metrics
+    volumes:
+      - ../services/account-monitor/config:/app/config
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+    networks:
+      - b25-network
+    restart: unless-stopped
 
-  # web-dashboard:
-  #   build:
-  #     context: ../ui/web
-  #     dockerfile: Dockerfile
-  #   container_name: b25-web-dashboard
-  #   ports:
-  #     - "3000:80"
-  #   depends_on:
-  #     - dashboard-server
-  #   networks:
-  #     - b25-network
+  configuration:
+    build:
+      context: ../services/configuration
+      dockerfile: Dockerfile
+      target: development
+    container_name: b25-configuration
+    environment:
+      - LOG_LEVEL=debug
+      - POSTGRES_URL=postgres://b25:dev_password@postgres:5432/b25_config?sslmode=disable
+      - REDIS_URL=redis://redis:6379
+      - GRPC_PORT=50056
+      - HTTP_PORT=8085
+      - METRICS_PORT=9105
+    ports:
+      - "50056:50056"  # gRPC
+      - "8085:8085"    # HTTP API
+      - "9105:9105"    # Metrics
+    volumes:
+      - ../services/configuration/config:/app/config
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8085/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks:
+      - b25-network
+    restart: unless-stopped
+
+  dashboard-server:
+    build:
+      context: ../services/dashboard-server
+      dockerfile: Dockerfile
+      target: development
+    container_name: b25-dashboard-server
+    environment:
+      - LOG_LEVEL=debug
+      - REDIS_URL=redis://redis:6379
+      - NATS_URL=nats://nats:4222
+      - HTTP_PORT=8086
+      - METRICS_PORT=9106
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+    ports:
+      - "8086:8086"    # HTTP API
+      - "9106:9106"    # Metrics
+    volumes:
+      - ../services/dashboard-server/config:/app/config
+    depends_on:
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      market-data:
+        condition: service_healthy
+      order-execution:
+        condition: service_healthy
+      account-monitor:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+    networks:
+      - b25-network
+    restart: unless-stopped
+
+  # ============================================
+  # API Gateway & Auth Services
+  # ============================================
+
+  api-gateway:
+    build:
+      context: ../services/api-gateway
+      dockerfile: Dockerfile
+      target: development
+    container_name: b25-api-gateway
+    environment:
+      - NODE_ENV=development
+      - PORT=8000
+      - REDIS_URL=redis://redis:6379
+      - NATS_URL=nats://nats:4222
+      - MARKET_DATA_URL=http://market-data:8080
+      - ORDER_EXECUTION_URL=http://order-execution:8081
+      - STRATEGY_ENGINE_URL=http://strategy-engine:8082
+      - RISK_MANAGER_URL=http://risk-manager:8083
+      - ACCOUNT_MONITOR_URL=http://account-monitor:8084
+      - CONFIGURATION_URL=http://configuration:8085
+      - DASHBOARD_SERVER_URL=http://dashboard-server:8086
+      - JWT_SECRET=dev_secret_change_in_production
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../services/api-gateway/config:/app/config
+    depends_on:
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      market-data:
+        condition: service_healthy
+      order-execution:
+        condition: service_healthy
+      strategy-engine:
+        condition: service_healthy
+      dashboard-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+    networks:
+      - b25-network
+    restart: unless-stopped
+
+  auth:
+    build:
+      context: ../services/auth
+      dockerfile: Dockerfile
+      target: development
+    container_name: b25-auth
+    environment:
+      - NODE_ENV=development
+      - PORT=8001
+      - POSTGRES_URL=postgresql://b25:dev_password@postgres:5432/b25_config
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=dev_secret_change_in_production
+      - JWT_EXPIRY=24h
+    ports:
+      - "8001:8001"
+    volumes:
+      - ../services/auth/config:/app/config
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks:
+      - b25-network
+    restart: unless-stopped
+
+  # ============================================
+  # UI Services
+  # ============================================
+
+  web-dashboard:
+    build:
+      context: ../ui/web
+      dockerfile: Dockerfile
+      target: development
+    container_name: b25-web-dashboard
+    environment:
+      - VITE_API_URL=http://localhost:8000
+      - VITE_WS_URL=ws://localhost:8086
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../ui/web/src:/app/src
+      - ../ui/web/public:/app/public
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+      dashboard-server:
+        condition: service_healthy
+    networks:
+      - b25-network
+    restart: unless-stopped
 
 networks:
   b25-network:
     driver: bridge
+    name: b25-network
 
 volumes:
   redis-data:
+    name: b25-redis-data
   postgres-data:
+    name: b25-postgres-data
   timescaledb-data:
+    name: b25-timescaledb-data
+  nats-data:
+    name: b25-nats-data
   prometheus-data:
+    name: b25-prometheus-data
   grafana-data:
+    name: b25-grafana-data
+  alertmanager-data:
+    name: b25-alertmanager-data

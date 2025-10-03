@@ -1,0 +1,58 @@
+server:
+  port: 9095
+  mode: development
+  read_timeout: 10s
+  write_timeout: 10s
+  shutdown_timeout: 15s
+
+database:
+  host: localhost
+  port: 5432
+  user: postgres
+  password: postgres
+  database: risk_manager
+  ssl_mode: disable
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: 5m
+
+redis:
+  host: localhost
+  port: 6379
+  password: ""
+  db: 0
+  max_retries: 3
+  pool_size: 10
+
+nats:
+  url: nats://localhost:4222
+  max_reconnect: 10
+  reconnect_wait: 2s
+  alert_subject: risk.alerts
+  emergency_topic: risk.emergency
+
+grpc:
+  port: 50051
+  max_connection_idle: 5m
+  max_connection_age: 30m
+  keep_alive_interval: 30s
+  keep_alive_timeout: 10s
+
+risk:
+  monitor_interval: 1s
+  cache_ttl: 100ms
+  policy_cache_ttl: 1s
+  max_leverage: 10.0
+  max_drawdown_percent: 0.20
+  emergency_threshold: 0.25
+  alert_window: 5m
+  account_monitor_url: localhost:50053
+  market_data_redis_db: 1
+
+logging:
+  level: info
+  format: json
+
+metrics:
+  enabled: true
+  port: 9095

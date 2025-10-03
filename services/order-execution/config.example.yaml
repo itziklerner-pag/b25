@@ -1,0 +1,58 @@
+# Order Execution Service Configuration
+
+server:
+  grpc_port: 50051
+  http_port: 9091
+  host: "0.0.0.0"
+
+exchange:
+  # Binance Futures API credentials
+  api_key: "${BINANCE_API_KEY}"
+  secret_key: "${BINANCE_SECRET_KEY}"
+  testnet: true  # Use testnet for development
+
+redis:
+  address: "localhost:6379"
+  password: ""
+  db: 0
+
+nats:
+  address: "nats://localhost:4222"
+
+rate_limit:
+  # Binance Futures limits: 2400 requests/minute = 40 req/s
+  # We use conservative limit to prevent hitting exchange limits
+  requests_per_second: 10
+  burst: 20
+
+logging:
+  level: "info"  # debug, info, warn, error
+  format: "json"  # json, console
+
+# Risk limits (configured per environment)
+risk:
+  max_order_value: 1000000      # Maximum order value in USD
+  max_position_size: 10          # Maximum position size in base currency
+  max_daily_orders: 10000        # Maximum orders per day
+  max_open_orders: 500           # Maximum concurrent open orders
+
+  # Allowed trading symbols
+  allowed_symbols:
+    - BTCUSDT
+    - ETHUSDT
+    - BNBUSDT
+    - SOLUSDT
+
+# Circuit breaker configuration
+circuit_breaker:
+  max_requests: 3                # Max requests in half-open state
+  interval: 60                   # Reset interval in seconds
+  timeout: 30                    # Time to wait in open state (seconds)
+  failure_threshold: 5           # Failures before opening circuit
+  success_threshold: 2           # Successes needed to close circuit
+
+# Performance tuning
+performance:
+  max_concurrent_orders: 100     # Maximum concurrent order submissions
+  order_cache_ttl: 86400         # Order cache TTL in seconds (24h)
+  symbol_info_refresh: 3600      # Symbol info refresh interval (1h)

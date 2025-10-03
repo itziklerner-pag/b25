@@ -1,0 +1,75 @@
+# Account Monitor Service Configuration
+
+service:
+  name: account-monitor
+  version: 1.0.0
+
+grpc:
+  port: 50051
+  max_connections: 100
+
+http:
+  port: 8080
+  dashboard_enabled: true
+
+metrics:
+  port: 9093
+  path: /metrics
+
+exchange:
+  name: binance
+  testnet: true
+  api_key_env: BINANCE_API_KEY
+  secret_key_env: BINANCE_SECRET_KEY
+  websocket:
+    reconnect_interval: 5s
+    ping_interval: 30s
+    timeout: 60s
+
+database:
+  postgres:
+    host: localhost
+    port: 5432
+    database: trading
+    user: trading
+    password_env: POSTGRES_PASSWORD
+    max_connections: 10
+    ssl_mode: disable
+
+  redis:
+    host: localhost
+    port: 6379
+    db: 0
+    password: ""
+
+reconciliation:
+  enabled: true
+  interval: 5s  # Reconcile every 5 seconds
+  balance_tolerance: "0.00001"
+  position_tolerance: "0.0001"
+
+alerts:
+  enabled: true
+  thresholds:
+    min_balance: "1000.0"
+    max_drawdown_pct: "-5.0"
+    max_margin_ratio: "0.8"
+    balance_drift_pct: "1.0"
+    position_drift_pct: "1.0"
+  suppression_duration: 60s
+
+pubsub:
+  provider: nats
+  nats:
+    url: nats://localhost:4222
+    max_reconnects: 10
+    reconnect_wait: 2s
+  topics:
+    fill_events: trading.fills
+    alerts: trading.alerts
+    pnl_updates: trading.pnl
+
+logging:
+  level: info  # debug, info, warn, error
+  format: json
+  output: stdout

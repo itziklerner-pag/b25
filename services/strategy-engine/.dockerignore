@@ -1,0 +1,32 @@
+# Build artifacts
+bin/
+*.so
+*.exe
+
+# Tests
+*_test.go
+testdata/
+
+# Documentation
+*.md
+docs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Temporary files
+tmp/
+*.tmp
+*.log
+
+# Development
+config.yaml
+.env
+.env.local

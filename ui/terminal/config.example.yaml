@@ -1,0 +1,87 @@
+# B25 Terminal UI Configuration Example
+# Copy this file to config.yaml and modify as needed
+
+# WebSocket Connection Settings
+connection:
+  # Dashboard Server WebSocket URL
+  dashboard_url: "ws://localhost:8080/ws"
+
+  # Reconnection settings
+  reconnect_interval_ms: 1000
+  max_reconnect_interval_ms: 30000
+
+  # Connection timeout
+  timeout_ms: 5000
+
+# UI Settings
+ui:
+  # Refresh rate in milliseconds (100ms = 10 FPS)
+  refresh_rate_ms: 100
+
+  # Color scheme: default, solarized, gruvbox, dracula
+  color_scheme: "default"
+
+  # Show milliseconds in time display
+  show_milliseconds: false
+
+  # Stale data warning threshold (seconds)
+  stale_data_threshold_s: 5
+
+# Panel Configuration
+panels:
+  # Default symbol to display in orderbook
+  default_symbol: "BTCUSDT"
+
+  # Maximum number of fills to display
+  max_fills_display: 50
+
+  # Maximum number of AI signals to display
+  max_signals_display: 20
+
+  # Maximum number of alerts to display
+  max_alerts_display: 100
+
+  # Number of orderbook depth levels to show
+  orderbook_depth_levels: 10
+
+  # Auto-dismiss INFO alerts after N seconds (0 = never)
+  alert_auto_dismiss_s: 30
+
+# Keyboard Shortcuts
+keyboard:
+  # Quit application
+  quit_keys: ["q"]
+
+  # Show help overlay
+  help_key: "?"
+
+  # Reload configuration
+  reload_key: "r"
+
+  # Enter command mode
+  command_key: ":"
+
+  # Symbol search
+  search_key: "/"
+
+# Performance Settings
+performance:
+  # Enable dirty flag optimization (only redraw changed panels)
+  enable_dirty_flag_optimization: true
+
+  # Maximum CPU percentage target
+  max_cpu_percent: 5.0
+
+  # Maximum memory usage in MB
+  max_memory_mb: 50
+
+# Logging Configuration
+logging:
+  # Log level: trace, debug, info, warn, error
+  level: "info"
+
+  # Log file path (optional, empty for no file logging)
+  file: ""
+
+  # Enable JSON formatted logs
+  json: false

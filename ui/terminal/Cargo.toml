@@ -1,0 +1,53 @@
+[package]
+name = "b25-terminal-ui"
+version = "1.0.0"
+edition = "2021"
+authors = ["B25 Team"]
+description = "Real-time terminal UI for HFT trading system"
+license = "MIT"
+
+[dependencies]
+# TUI Framework
+ratatui = "0.26"
+crossterm = { version = "0.27", features = ["event-stream"] }
+
+# Async Runtime
+tokio = { version = "1.35", features = ["full"] }
+tokio-tungstenite = "0.21"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+
+# Date/Time
+chrono = "0.4"
+
+# Error Handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Utilities
+parking_lot = "0.12"
+futures = "0.3"
+clap = { version = "4.4", features = ["derive"] }
+
+[dev-dependencies]
+insta = "1.34"
+criterion = "0.5"
+mockito = "1.2"
+tokio-test = "0.4"
+
+[[bench]]
+name = "rendering"
+harness = false
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
