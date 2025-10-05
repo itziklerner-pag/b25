@@ -128,8 +128,8 @@ type LoggingConfig struct {
 	Output string `mapstructure:"output"`
 }
 
-// stringToDecimalHookFunc is a custom decode hook that converts strings to decimal.Decimal
-func stringToDecimalHookFunc() mapstructure.DecodeHookFunc {
+// toDecimalHookFunc is a custom decode hook that converts strings and numeric types to decimal.Decimal
+func toDecimalHookFunc() mapstructure.DecodeHookFunc {
 	return func(
 		f reflect.Type,
 		t reflect.Type,
@@ -140,19 +140,72 @@ func stringToDecimalHookFunc() mapstructure.DecodeHookFunc {
 			return data, nil
 		}
 
-		// Check if the source is a string
-		if f.Kind() != reflect.String {
+		// Handle different source types
+		switch f.Kind() {
+		case reflect.String:
+			// Convert string to decimal.Decimal
+			strVal := data.(string)
+			decVal, err := decimal.NewFromString(strVal)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse decimal from string '%s': %w", strVal, err)
+			}
+			return decVal, nil
+
+		case reflect.Float32, reflect.Float64:
+			// Convert float to decimal.Decimal
+			var floatVal float64
+			switch v := data.(type) {
+			case float32:
+				floatVal = float64(v)
+			case float64:
+				floatVal = v
+			default:
+				return data, nil
+			}
+			return decimal.NewFromFloat(floatVal), nil
+
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			// Convert int to decimal.Decimal
+			var intVal int64
+			switch v := data.(type) {
+			case int:
+				intVal = int64(v)
+			case int8:
+				intVal = int64(v)
+			case int16:
+				intVal = int64(v)
+			case int32:
+				intVal = int64(v)
+			case int64:
+				intVal = v
+			default:
+				return data, nil
+			}
+			return decimal.NewFromInt(intVal), nil
+
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			// Convert uint to decimal.Decimal
+			var uintVal uint64
+			switch v := data.(type) {
+			case uint:
+				uintVal = uint64(v)
+			case uint8:
+				uintVal = uint64(v)
+			case uint16:
+				uintVal = uint64(v)
+			case uint32:
+				uintVal = uint64(v)
+			case uint64:
+				uintVal = v
+			default:
+				return data, nil
+			}
+			return decimal.NewFromInt(int64(uintVal)), nil
+
+		default:
+			// Not a type we can convert from
 			return data, nil
 		}
-
-		// Convert string to decimal.Decimal
-		strVal := data.(string)
-		decVal, err := decimal.NewFromString(strVal)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse decimal from string '%s': %w", strVal, err)
-		}
-
-		return decVal, nil
 	}
 }
 
@@ -170,7 +223,7 @@ func Load() (*Config, error) {
 	// Create decoder with custom decode hook for decimal.Decimal
 	decoderConfig := &mapstructure.DecoderConfig{
 		DecodeHook: mapstructure.ComposeDecodeHookFunc(
-			stringToDecimalHookFunc(),
+			toDecimalHookFunc(),
 			mapstructure.StringToTimeDurationHookFunc(),
 			mapstructure.StringToSliceHookFunc(","),
 		),
