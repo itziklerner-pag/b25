@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useTradingStore } from '@/store/trading';
 import type { WebSocketMessage } from '@/types';
+import { logger } from '@/utils/logger';
 
 interface UseWebSocketOptions {
   url: string;
@@ -24,6 +25,7 @@ export function useWebSocket({
   const setStatus = useTradingStore((state) => state.setStatus);
   const setLatency = useTradingStore((state) => state.setLatency);
   const updateOrderBook = useTradingStore((state) => state.updateOrderBook);
+  const updateMarketData = useTradingStore((state) => state.updateMarketData);
   const updatePosition = useTradingStore((state) => state.updatePosition);
   const updateOrder = useTradingStore((state) => state.updateOrder);
   const removeOrder = useTradingStore((state) => state.removeOrder);
@@ -37,15 +39,98 @@ export function useWebSocket({
       try {
         const message: WebSocketMessage = JSON.parse(event.data);
 
+        logger.debug('WebSocket', 'Received message', {
+          type: message.type,
+          channel: message.channel,
+          timestamp: new Date().toISOString(),
+        });
+
         // Handle pong for latency measurement
         if (message.type === 'pong' && message.timestamp) {
           const now = Date.now();
           setLatency(now - message.timestamp);
+          logger.trace('WebSocket', 'Latency measured', { latency: now - message.timestamp });
           return;
         }
 
         // Route message to appropriate store action
         switch (message.type) {
+          case 'snapshot':
+          case 'full_state':
+            // Handle initial snapshot with all data
+            if (message.data) {
+              logger.info('WebSocket', 'Processing full_state/snapshot', {
+                hasMarketData: !!message.data.market_data,
+                hasAccount: !!message.data.account,
+                hasOrders: !!message.data.orders,
+                hasPositions: !!message.data.positions,
+              });
+
+              // Update market data (prices)
+              if (message.data.market_data) {
+                logger.debug('WebSocket', 'Received market_data', message.data.market_data);
+                Object.entries(message.data.market_data).forEach(([symbol, data]: [string, any]) => {
+                  // Check if this is market data (has last_price) or full orderbook (has bids/asks)
+                  if (data.last_price !== undefined) {
+                    // This is market price data
+                    logger.debug('WebSocket', `Updating market data for ${symbol}`, data);
+                    updateMarketData(symbol, data);
+                  } else if (data.bids && data.asks) {
+                    // This is full orderbook data
+                    logger.debug('WebSocket', `Updating orderbook for ${symbol}`);
+                    updateOrderBook(symbol, { ...data, symbol, timestamp: Date.now() });
+                  }
+                });
+              }
+              // Update account
+              if (message.data.account) {
+                updateAccount(message.data.account);
+              }
+              // Update orders
+              if (message.data.orders && Array.isArray(message.data.orders)) {
+                message.data.orders.forEach((order: any) => updateOrder(order));
+              }
+              // Update positions
+              if (message.data.positions) {
+                Object.values(message.data.positions).forEach((pos: any) => updatePosition(pos));
+              }
+              logger.info('WebSocket', 'Processed full state snapshot');
+            }
+            break;
+
+          case 'update':
+          case 'incremental':
+            // Handle incremental updates - uses 'changes' field, not 'data'!
+            const updateData = message.changes || message.data;
+            if (updateData) {
+              logger.debug('WebSocket', 'Received incremental update', {
+                hasChanges: !!message.changes,
+                hasData: !!message.data,
+                hasMarketData: !!(updateData.market_data || updateData.MarketData),
+                rawUpdate: updateData,
+              });
+
+              // Process market data updates (check both snake_case and PascalCase)
+              const marketDataUpdates = updateData.market_data || updateData.MarketData;
+              if (marketDataUpdates) {
+                Object.entries(marketDataUpdates).forEach(([symbol, data]: [string, any]) => {
+                  // Check if this is market data or orderbook
+                  if (data.last_price !== undefined || data.LastPrice !== undefined) {
+                    logger.debug('WebSocket', `Incremental update for ${symbol}`, data);
+                    updateMarketData(symbol, data);
+                  } else if (data.bids && data.asks) {
+                    updateOrderBook(symbol, { ...data, symbol, timestamp: Date.now() });
+                  }
+                });
+              }
+
+              const accountUpdate = updateData.account || updateData.Account;
+              if (accountUpdate) {
+                updateAccount(accountUpdate);
+              }
+            }
+            break;
+
           case 'orderbook':
             if (message.data) {
               updateOrderBook(message.data.symbol, message.data);
@@ -87,15 +172,16 @@ export function useWebSocket({
             break;
 
           default:
-            console.warn('Unknown message type:', message.type);
+            logger.warn('WebSocket', 'Unknown message type', { type: message.type });
         }
       } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
+        logger.error('WebSocket', 'Error parsing message', error);
       }
     },
     [
       setLatency,
       updateOrderBook,
+      updateMarketData,
       updatePosition,
       updateOrder,
       removeOrder,
@@ -113,6 +199,7 @@ export function useWebSocket({
           timestamp: Date.now(),
         })
       );
+      logger.trace('WebSocket', 'Heartbeat sent');
     }
   }, []);
 
@@ -121,14 +208,14 @@ export function useWebSocket({
       return;
     }
 
-    console.log('Connecting to WebSocket:', url);
+    logger.info('WebSocket', 'Connecting to', { url });
     setStatus('connecting');
 
     try {
       const ws = new WebSocket(url);
 
       ws.onopen = () => {
-        console.log('WebSocket connected');
+        logger.info('WebSocket', 'Connected successfully');
         setStatus('connected');
         setWs(ws);
         reconnectAttemptsRef.current = 0;
@@ -136,17 +223,18 @@ export function useWebSocket({
         // Start heartbeat
         heartbeatRef.current = window.setInterval(sendHeartbeat, heartbeatInterval);
 
-        // Subscribe to initial channels
+        // Subscribe to all channels including market_data and strategies
         ws.send(
           JSON.stringify({
             type: 'subscribe',
-            channels: ['account', 'positions', 'orders', 'trades', 'system_health'],
+            channels: ['market_data', 'account', 'positions', 'orders', 'trades', 'strategies', 'system_health'],
           })
         );
+        logger.info('WebSocket', 'Sent subscription request');
       };
 
       ws.onclose = (event) => {
-        console.log('WebSocket disconnected:', event.code, event.reason);
+        logger.warn('WebSocket', 'Disconnected', { code: event.code, reason: event.reason });
         setStatus('disconnected');
         setWs(null);
 
@@ -162,21 +250,22 @@ export function useWebSocket({
         if (reconnectAttemptsRef.current < maxReconnectAttempts) {
           reconnectAttemptsRef.current++;
           const delay = reconnectInterval * Math.pow(2, reconnectAttemptsRef.current - 1);
-          console.log(
-            `Reconnecting in ${delay}ms... (attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts})`
-          );
+          logger.info('WebSocket', `Reconnecting in ${delay}ms`, {
+            attempt: reconnectAttemptsRef.current,
+            maxAttempts: maxReconnectAttempts,
+          });
 
           reconnectTimeoutRef.current = window.setTimeout(() => {
             connect();
           }, delay);
         } else {
-          console.error('Max reconnection attempts reached');
+          logger.error('WebSocket', 'Max reconnection attempts reached');
           setStatus('error');
         }
       };
 
       ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+        logger.error('WebSocket', 'Connection error', error);
         setStatus('error');
       };
 
@@ -184,7 +273,7 @@ export function useWebSocket({
 
       wsRef.current = ws;
     } catch (error) {
-      console.error('Failed to create WebSocket connection:', error);
+      logger.error('WebSocket', 'Failed to create connection', error);
       setStatus('error');
     }
   }, [
@@ -212,6 +301,7 @@ export function useWebSocket({
     }
     setWs(null);
     setStatus('disconnected');
+    logger.info('WebSocket', 'Disconnected by client');
   }, [setWs, setStatus]);
 
   useEffect(() => {

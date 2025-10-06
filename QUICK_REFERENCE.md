@@ -1,92 +1,70 @@
-# B25 System - Quick Reference Card
+# CORS Fix Quick Reference
 
-## 🚀 START THE SYSTEM
+## What Was Changed
+Added CORS headers to all service health endpoints to fix browser CORS errors in the ServiceMonitor component.
+
+## Files Modified (8 total)
+```
+services/order-execution/internal/health/health.go
+services/account-monitor/internal/health/checker.go
+services/configuration/internal/api/health_handler.go
+services/api-gateway/internal/handlers/health.go
+services/strategy-engine/cmd/server/main.go
+services/risk-manager/cmd/server/main.go
+services/dashboard-server/cmd/server/main.go
+services/market-data/src/health.rs (Rust)
+```
+
+## How to Deploy
+
+### 1. Rebuild All Services
 ```bash
 cd /home/mm/dev/b25
-./run-all-services.sh
+./rebuild-services.sh
 ```
 
-## 🛑 STOP THE SYSTEM
+### 2. Restart Services
+Stop and start all 8 services using your service manager (systemd, docker-compose, etc.)
+
+### 3. Test CORS Headers
 ```bash
-cd /home/mm/dev/b25
-./stop-all-services.sh
+./test-cors-headers.sh
 ```
 
-## 🔍 CHECK STATUS
+### 4. Verify in Browser
+- Open dashboard UI
+- Check browser console (F12)
+- Should see NO CORS errors
+
+## Quick Test
 ```bash
-cd /home/mm/dev/b25
-./sanity-check.sh
+# Test one service
+curl -H "Origin: http://localhost:3000" http://localhost:8086/health -v
+
+# Look for these headers in response:
+# Access-Control-Allow-Origin: *
+# Access-Control-Allow-Methods: GET, OPTIONS
+# Access-Control-Allow-Headers: Content-Type
 ```
 
-## 🌐 ACCESS FROM LOCAL MACHINE
+## Service Ports
+- 8080: API Gateway
+- 8081: Order Execution
+- 8082: Strategy Engine
+- 8083: Account Monitor
+- 8084: Configuration
+- 8085: Risk Manager
+- 8086: Dashboard Server
+- 8087: Market Data
 
-### 1. Run SSH Tunnel (on LOCAL machine):
+## Rollback
 ```bash
-~/tunnel.sh
+git checkout HEAD -- services/*/internal/health/*.go
+git checkout HEAD -- services/*/cmd/server/main.go
+git checkout HEAD -- services/*/src/health.rs
+# Then rebuild and restart
 ```
 
-### 2. Open in Browser:
-- **Trading Dashboard:** http://localhost:3000
-- **Grafana:** http://localhost:3001 (admin / BqDocPUqSRa8lffzfuleLw==)
-- **Prometheus:** http://localhost:9090
-
-## 📊 ALL SERVICE PORTS
-
-| Service | HTTP | gRPC | Metrics |
-|---------|------|------|---------|
-| Market Data | 8080 | 50051 | 9100 |
-| Order Execution | 8081 | 50052 | 9101 |
-| Strategy Engine | 8082 | 50053 | 9102 |
-| Risk Manager | 8083 | 50054 | 9103 |
-| Account Monitor | 8084 | 50055 | 9104 |
-| Configuration | 8085 | 50056 | 9105 |
-| Dashboard Server | 8086 | - | 9106 |
-| API Gateway | 8000 | - | - |
-| Auth Service | 9097 | - | - |
-| Web Dashboard | 3000 | - | - |
-
-## 📝 VIEW LOGS
-```bash
-# All logs
-tail -f /home/mm/dev/b25/logs/*.log
-
-# Specific service
-tail -f /home/mm/dev/b25/logs/strategy-engine.log
-```
-
-## 🏥 HEALTH CHECKS
-```bash
-curl localhost:8080/health  # Market Data
-curl localhost:8081/health  # Order Execution
-curl localhost:8082/health  # Strategy Engine
-curl localhost:8086/health  # Dashboard Server
-```
-
-## ⚠️ CURRENT MODE: SIMULATION
-- Strategies are active and analyzing market
-- Orders validated but NOT sent to exchange
-- Safe for testing - no real money at risk
-
-## 🔄 TO ENABLE LIVE TRADING
-```bash
-nano /home/mm/dev/b25/services/strategy-engine/config.yaml
-# Change: execution_mode: live
-# Restart: kill $(cat logs/strategy-engine.pid) && cd services/strategy-engine && ./bin/service &
-```
-
-## 📍 KEY FILES
-- **Start:** `/home/mm/dev/b25/run-all-services.sh`
-- **Stop:** `/home/mm/dev/b25/stop-all-services.sh`
-- **Status:** `/home/mm/dev/b25/sanity-check.sh`
-- **SSH Tunnel:** `/home/mm/dev/b25/tunnel.sh`
-- **Config:** `/home/mm/dev/b25/.env`
-- **Logs:** `/home/mm/dev/b25/logs/`
-
-## ✅ SYSTEM STATUS
-- 16/16 services running
-- 5/5 health checks passing
-- Binance testnet connected
-- 3 trading strategies active
-- Web dashboard operational
-
-**STATUS: FULLY OPERATIONAL** ✅
+## Documentation
+- Full details: `IMPLEMENTATION_SUMMARY.md`
+- CORS specifics: `CORS_FIX_SUMMARY.md`

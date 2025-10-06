@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import type {
   OrderBook,
+  MarketData,
   Position,
   Order,
   Trade,
@@ -10,6 +11,7 @@ import type {
   OrderRequest,
   ConnectionStatus,
 } from '@/types';
+import { logger } from '@/utils/logger';
 
 interface TradingStore {
   // WebSocket connection state
@@ -20,6 +22,7 @@ interface TradingStore {
 
   // Trading data
   orderbooks: Map<string, OrderBook>;
+  marketData: Map<string, MarketData>;  // NEW: Separate market data storage
   positions: Map<string, Position>;
   orders: Map<string, Order>;
   trades: Trade[];
@@ -29,11 +32,21 @@ interface TradingStore {
   // UI state
   selectedSymbol: string;
 
+  // Debug state
+  debugInfo: {
+    lastWsMessage: number;
+    lastStoreUpdate: number;
+    updateCount: number;
+    lastSymbol: string;
+    lastPrice: number;
+  };
+
   // Actions
   setWs: (ws: WebSocket | null) => void;
   setStatus: (status: ConnectionStatus) => void;
   setLatency: (latency: number) => void;
   updateOrderBook: (symbol: string, data: OrderBook) => void;
+  updateMarketData: (symbol: string, data: MarketData) => void;  // NEW
   updatePosition: (position: Position) => void;
   updateOrder: (order: Order) => void;
   removeOrder: (orderId: string) => void;
@@ -60,12 +73,20 @@ export const useTradingStore = create<TradingStore>()(
       latency: 0,
       lastUpdate: Date.now(),
       orderbooks: new Map(),
+      marketData: new Map(),  // NEW
       positions: new Map(),
       orders: new Map(),
       trades: [],
       account: null,
       systemHealth: [],
       selectedSymbol: 'BTCUSDT',
+      debugInfo: {
+        lastWsMessage: 0,
+        lastStoreUpdate: 0,
+        updateCount: 0,
+        lastSymbol: '',
+        lastPrice: 0,
+      },
 
       // Connection actions
       setWs: (ws) => set({ ws }),
@@ -81,10 +102,46 @@ export const useTradingStore = create<TradingStore>()(
         });
       },
 
+      updateMarketData: (symbol, data) => {
+        const timestamp = Date.now();
+
+        // CRITICAL FIX: Use set with a function to ensure we're working with fresh state
+        set((state) => {
+          // Create completely new Map instance (not just copy)
+          const newMarketData = new Map(state.marketData);
+          newMarketData.set(symbol, { ...data, timestamp });
+
+          // Update debug info
+          const newDebugInfo = {
+            lastWsMessage: timestamp,
+            lastStoreUpdate: timestamp,
+            updateCount: state.debugInfo.updateCount + 1,
+            lastSymbol: symbol,
+            lastPrice: data.last_price || 0,
+          };
+
+          logger.debug('Store', `Updated market data for ${symbol}`, {
+            last_price: data.last_price,
+            price_change_24h: data.price_change_24h,
+            timestamp: new Date(timestamp).toISOString(),
+            mapSize: newMarketData.size,
+            updateCount: newDebugInfo.updateCount,
+          });
+
+          // Return COMPLETELY NEW STATE OBJECT with all new references
+          return {
+            marketData: newMarketData,
+            lastUpdate: timestamp,
+            debugInfo: newDebugInfo,
+          };
+        });
+      },
+
       updatePosition: (position) => {
         set((state) => {
           const newPositions = new Map(state.positions);
           newPositions.set(position.symbol, position);
+          logger.debug('Store', 'Updated position', { symbol: position.symbol, size: position.size });
           return { positions: newPositions, lastUpdate: Date.now() };
         });
       },
@@ -93,6 +150,7 @@ export const useTradingStore = create<TradingStore>()(
         set((state) => {
           const newOrders = new Map(state.orders);
           newOrders.set(order.id, order);
+          logger.debug('Store', 'Updated order', { id: order.id, status: order.status });
           return { orders: newOrders, lastUpdate: Date.now() };
         });
       },
@@ -101,32 +159,41 @@ export const useTradingStore = create<TradingStore>()(
         set((state) => {
           const newOrders = new Map(state.orders);
           newOrders.delete(orderId);
+          logger.debug('Store', 'Removed order', { id: orderId });
           return { orders: newOrders, lastUpdate: Date.now() };
         });
       },
 
       addTrade: (trade) => {
-        set((state) => ({
-          trades: [trade, ...state.trades].slice(0, 100), // Keep last 100 trades
-          lastUpdate: Date.now(),
-        }));
+        set((state) => {
+          logger.debug('Store', 'Added trade', { symbol: trade.symbol, side: trade.side });
+          return {
+            trades: [trade, ...state.trades].slice(0, 100), // Keep last 100 trades
+            lastUpdate: Date.now(),
+          };
+        });
       },
 
       updateAccount: (account) => {
+        logger.debug('Store', 'Updated account', { balance: account.balance, equity: account.equity });
         set({ account, lastUpdate: Date.now() });
       },
 
       updateSystemHealth: (health) => {
+        logger.debug('Store', 'Updated system health', { services: health.length });
         set({ systemHealth: health });
       },
 
       setSelectedSymbol: (symbol) => {
+        logger.info('Store', 'Selected symbol changed', { symbol });
         set({ selectedSymbol: symbol });
       },
 
       clearData: () => {
+        logger.info('Store', 'Clearing all data');
         set({
           orderbooks: new Map(),
+          marketData: new Map(),  // NEW
           positions: new Map(),
           orders: new Map(),
           trades: [],
@@ -145,6 +212,9 @@ export const useTradingStore = create<TradingStore>()(
               data: order,
             })
           );
+          logger.info('Store', 'Sent order', { symbol: order.symbol, side: order.side, type: order.type });
+        } else {
+          logger.warn('Store', 'Cannot send order - not connected');
         }
       },
 
@@ -158,6 +228,9 @@ export const useTradingStore = create<TradingStore>()(
               data: { orderId },
             })
           );
+          logger.info('Store', 'Sent cancel order', { orderId });
+        } else {
+          logger.warn('Store', 'Cannot cancel order - not connected');
         }
       },
 
@@ -171,6 +244,9 @@ export const useTradingStore = create<TradingStore>()(
               data: { symbol },
             })
           );
+          logger.info('Store', 'Sent close position', { symbol });
+        } else {
+          logger.warn('Store', 'Cannot close position - not connected');
         }
       },
 
@@ -183,6 +259,7 @@ export const useTradingStore = create<TradingStore>()(
               channel,
             })
           );
+          logger.info('Store', 'Subscribed to channel', { channel });
         }
       },
 
@@ -195,6 +272,7 @@ export const useTradingStore = create<TradingStore>()(
               channel,
             })
           );
+          logger.info('Store', 'Unsubscribed from channel', { channel });
         }
       },
     }),

@@ -274,12 +274,28 @@ func startGRPCServer(cfg *config.Config, logger *zap.Logger, riskServer *grpc.Ri
 	return grpcSrv
 }
 
+// setCORSHeaders sets CORS headers for health endpoints
+func setCORSHeaders(w http.ResponseWriter) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+}
+
 func startMetricsServer(cfg *config.Config, logger *zap.Logger) {
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
 
 	// Health check endpoint
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		// Set CORS headers
+		setCORSHeaders(w)
+
+		// Handle OPTIONS preflight request
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
 	})

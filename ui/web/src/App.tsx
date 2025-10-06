@@ -12,8 +12,10 @@ import AnalyticsPage from '@/pages/AnalyticsPage';
 import TradingPage from '@/pages/TradingPage';
 import SystemPage from '@/pages/SystemPage';
 import LoginPage from '@/pages/LoginPage';
+import MarketDataServicePage from '@/pages/services/MarketDataServicePage';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { config } from '@/config/env';
+import { logger } from '@/utils/logger';
 
 function App() {
   useWebSocket({
@@ -23,7 +25,10 @@ function App() {
   });
 
   useEffect(() => {
-    console.log('B25 Web Dashboard initialized');
+    logger.info('App', 'B25 Web Dashboard initialized', {
+      environment: config.environment,
+      logLevel: logger.getLevelString(),
+    });
   }, []);
 
   return (
@@ -40,6 +45,7 @@ function App() {
               <Route path="analytics" element={<AnalyticsPage />} />
               <Route path="trade" element={<TradingPage />} />
               <Route path="system" element={<SystemPage />} />
+              <Route path="services/market-data" element={<MarketDataServicePage />} />
             </Route>
           </Routes>
         </BrowserRouter>

@@ -2,11 +2,22 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useTradingStore } from '@/store/trading';
 import { formatCurrency, formatPercent } from '@/lib/utils';
 import { TrendingUp, TrendingDown, DollarSign, Activity, Percent } from 'lucide-react';
+import { MarketPrices } from '@/components/MarketPrices';
+import { logger } from '@/utils/logger';
 
 export default function DashboardPage() {
   const account = useTradingStore((state) => state.account);
   const positions = useTradingStore((state) => Array.from(state.positions.values()));
   const orders = useTradingStore((state) => Array.from(state.orders.values()));
+  // Subscribe to lastUpdate to ensure re-renders when data changes
+  const lastUpdate = useTradingStore((state) => state.lastUpdate);
+
+  // Debug log
+  logger.trace('DashboardPage', 'Rendering', {
+    positionsCount: positions.length,
+    ordersCount: orders.length,
+    lastUpdate: new Date(lastUpdate).toISOString(),
+  });
 
   const stats = [
     {
@@ -70,7 +81,10 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-3">
+        {/* Market Prices - NEW */}
+        <MarketPrices />
+
         {/* Positions */}
         <Card>
           <CardHeader>

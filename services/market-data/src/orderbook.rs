@@ -17,6 +17,7 @@ pub struct OrderBook {
     pub asks: BTreeMap<OrderedFloat, f64>, // price -> quantity
     pub last_update_id: u64,
     pub timestamp: i64,
+    pub initialized: bool, // Track if we've received any data
 }
 
 // Wrapper for f64 to make it Ord for BTreeMap
@@ -66,12 +67,40 @@ impl OrderBook {
             asks: BTreeMap::new(),
             last_update_id: 0,
             timestamp: Utc::now().timestamp_micros(),
+            initialized: false,
         }
     }
 
     /// Apply a depth update (delta)
     pub fn apply_update(&mut self, update: &DepthUpdate) -> Result<(), String> {
-        // Sequence validation
+        // If not initialized yet, accept the first update as baseline
+        if !self.initialized {
+            self.initialized = true;
+            self.last_update_id = update.last_update_id;
+
+            // Apply all levels from first update
+            for level in &update.bids {
+                if level.quantity > 0.0 {
+                    self.bids.insert(OrderedFloat(level.price), level.quantity);
+                }
+            }
+            for level in &update.asks {
+                if level.quantity > 0.0 {
+                    self.asks.insert(OrderedFloat(level.price), level.quantity);
+                }
+            }
+
+            self.timestamp = Utc::now().timestamp_micros();
+            return Ok(());
+        }
+
+        // Sequence validation - allow updates that are within range
+        // Skip updates that are too old (already applied)
+        if update.last_update_id <= self.last_update_id {
+            return Ok(()); // Already processed
+        }
+
+        // Only error if there's a gap we can't handle
         if update.first_update_id > self.last_update_id + 1 {
             return Err(format!(
                 "Sequence gap detected: expected {}, got {}",
@@ -167,8 +196,8 @@ pub struct Trade {
 }
 
 pub struct OrderBookManager {
-    books: RwLock<AHashMap<String, OrderBook>>,
-    depth: usize,
+    pub books: RwLock<AHashMap<String, OrderBook>>,
+    pub depth: usize,
 }
 
 impl OrderBookManager {
@@ -248,6 +277,7 @@ mod tests {
     fn test_sequence_validation() {
         let mut book = OrderBook::new("BTCUSDT".to_string());
         book.last_update_id = 100;
+        book.initialized = true;
 
         let update = DepthUpdate {
             symbol: "BTCUSDT".to_string(),

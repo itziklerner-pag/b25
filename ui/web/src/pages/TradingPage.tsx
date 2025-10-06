@@ -7,6 +7,7 @@ import { useTradingStore } from '@/store/trading';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { OrderRequest } from '@/types';
+import { logger } from '@/utils/logger';
 
 export default function TradingPage() {
   const [side, setSide] = useState<'BUY' | 'SELL'>('BUY');
@@ -17,6 +18,17 @@ export default function TradingPage() {
   const account = useTradingStore((state) => state.account);
   const selectedSymbol = useTradingStore((state) => state.selectedSymbol);
   const sendOrder = useTradingStore((state) => state.sendOrder);
+
+  // FIXED: Subscribe to both marketData and lastUpdate to ensure re-renders
+  const marketData = useTradingStore((state) => state.marketData.get(selectedSymbol));
+  const lastUpdate = useTradingStore((state) => state.lastUpdate);
+
+  // Log when market data changes
+  logger.trace('TradingPage', 'Market data update', {
+    selectedSymbol,
+    marketData,
+    lastUpdate: new Date(lastUpdate).toISOString()
+  });
 
   const orderValue = useMemo(() => {
     const p = parseFloat(price) || 0;
@@ -43,6 +55,7 @@ export default function TradingPage() {
 
     if (!isValid) {
       toast.error('Invalid order parameters');
+      logger.warn('TradingPage', 'Invalid order submitted', { validation });
       return;
     }
 
@@ -56,6 +69,7 @@ export default function TradingPage() {
 
     sendOrder(order);
     toast.success('Order submitted');
+    logger.info('TradingPage', 'Order submitted', order);
 
     // Reset form
     setPrice('');
@@ -71,6 +85,15 @@ export default function TradingPage() {
     if (p > 0) {
       const q = (available * percentage) / 100 / p;
       setQuantity(q.toFixed(8));
+      logger.debug('TradingPage', 'Set percentage', { percentage, quantity: q.toFixed(8) });
+    }
+  };
+
+  // Use market price as default for limit orders
+  const fillMarketPrice = () => {
+    if (marketData?.last_price) {
+      setPrice(marketData.last_price.toString());
+      logger.debug('TradingPage', 'Filled market price', { price: marketData.last_price });
     }
   };
 
@@ -80,6 +103,12 @@ export default function TradingPage() {
         <CardHeader>
           <CardTitle>Place Order</CardTitle>
           <CardDescription>Submit manual orders to the exchange</CardDescription>
+          {marketData && (
+            <div className="mt-2 rounded-lg bg-muted p-2">
+              <div className="text-sm text-muted-foreground">Current Market Price:</div>
+              <div className="text-lg font-bold">{formatCurrency(marketData.last_price)}</div>
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -126,7 +155,20 @@ export default function TradingPage() {
             {/* Price */}
             {type === 'LIMIT' && (
               <div>
-                <Label>Price</Label>
+                <div className="flex items-center justify-between">
+                  <Label>Price</Label>
+                  {marketData && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={fillMarketPrice}
+                      className="h-6 text-xs"
+                    >
+                      Use Market Price
+                    </Button>
+                  )}
+                </div>
                 <Input
                   type="number"
                   step="0.01"

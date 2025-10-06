@@ -28,8 +28,18 @@ func NewHealthHandler(cfg *config.Config, log *logger.Logger, b *breaker.Manager
 	}
 }
 
+// setCORSHeaders sets CORS headers for health endpoints
+func setCORSHeaders(c *gin.Context) {
+	c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+	c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+}
+
 // Health returns the health status of the gateway
 func (h *HealthHandler) Health(c *gin.Context) {
+	// Set CORS headers
+	setCORSHeaders(c)
+
 	if !h.config.Health.Enabled {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 		return
@@ -66,6 +76,9 @@ func (h *HealthHandler) Health(c *gin.Context) {
 
 // Liveness returns liveness probe status
 func (h *HealthHandler) Liveness(c *gin.Context) {
+	// Set CORS headers
+	setCORSHeaders(c)
+
 	c.JSON(http.StatusOK, gin.H{
 		"status": "alive",
 	})
@@ -73,6 +86,9 @@ func (h *HealthHandler) Liveness(c *gin.Context) {
 
 // Readiness returns readiness probe status
 func (h *HealthHandler) Readiness(c *gin.Context) {
+	// Set CORS headers
+	setCORSHeaders(c)
+
 	// Check if gateway is ready to serve traffic
 	ready := true
 	reasons := make([]string, 0)

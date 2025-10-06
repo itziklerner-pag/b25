@@ -6,6 +6,7 @@ use anyhow::Result;
 pub struct Config {
     pub symbols: Vec<String>,
     pub exchange_ws_url: String,
+    pub exchange_rest_url: String,
     pub redis_url: String,
     pub order_book_depth: usize,
     pub health_port: u16,
@@ -19,6 +20,7 @@ impl Default for Config {
         Self {
             symbols: vec!["BTCUSDT".to_string(), "ETHUSDT".to_string()],
             exchange_ws_url: "wss://fstream.binance.com/stream".to_string(),
+            exchange_rest_url: "https://fapi.binance.com".to_string(),
             redis_url: "redis://127.0.0.1:6379".to_string(),
             order_book_depth: 20,
             health_port: 9090,

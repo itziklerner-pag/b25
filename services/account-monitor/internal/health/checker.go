@@ -43,8 +43,24 @@ func NewChecker(db *pgxpool.Pool, redis *redis.Client, wsClient *exchange.WebSoc
 	}
 }
 
+// setCORSHeaders sets CORS headers for health endpoints
+func setCORSHeaders(w http.ResponseWriter) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+}
+
 // HandleHealth handles health check requests
 func (h *Checker) HandleHealth(w http.ResponseWriter, r *http.Request) {
+	// Set CORS headers
+	setCORSHeaders(w)
+
+	// Handle OPTIONS preflight request
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	ctx := r.Context()
 
 	status := HealthStatus{
@@ -87,6 +103,15 @@ func (h *Checker) HandleHealth(w http.ResponseWriter, r *http.Request) {
 
 // HandleReady handles readiness probe requests
 func (h *Checker) HandleReady(w http.ResponseWriter, r *http.Request) {
+	// Set CORS headers
+	setCORSHeaders(w)
+
+	// Handle OPTIONS preflight request
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	ctx := r.Context()
 
 	// Check only critical dependencies

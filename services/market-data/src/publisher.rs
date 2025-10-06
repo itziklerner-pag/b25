@@ -1,6 +1,7 @@
 use anyhow::{Result, Context};
 use redis::aio::ConnectionManager;
 use redis::{AsyncCommands, Client};
+use serde::Serialize;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, error};
@@ -13,6 +14,18 @@ pub struct Publisher {
     redis_client: Client,
     redis_conn: Arc<RwLock<ConnectionManager>>,
     shm_ring: Arc<SharedMemoryRing>,
+}
+
+#[derive(Serialize)]
+struct MarketData {
+    symbol: String,
+    last_price: f64,
+    bid_price: f64,
+    ask_price: f64,
+    volume_24h: f64,
+    high_24h: f64,
+    low_24h: f64,
+    updated_at: String,
 }
 
 impl Publisher {
@@ -35,31 +48,81 @@ impl Publisher {
     }
 
     pub async fn publish_orderbook(&self, book: &OrderBook) -> Result<()> {
-        let channel = format!("orderbook:{}", book.symbol);
-        let payload = serde_json::to_string(book)
+        // 1. Publish full orderbook to orderbook:SYMBOL channel
+        let orderbook_channel = format!("orderbook:{}", book.symbol);
+        let orderbook_payload = serde_json::to_string(book)
             .context("Failed to serialize order book")?;
 
-        // Publish to Redis
-        match self.publish_redis(&channel, &payload).await {
+        match self.publish_redis(&orderbook_channel, &orderbook_payload).await {
             Ok(_) => {
                 metrics::REDIS_PUBLISHES
                     .with_label_values(&[&book.symbol, "orderbook"])
                     .inc();
             }
             Err(e) => {
-                error!("Failed to publish to Redis: {}", e);
+                error!("Failed to publish orderbook to Redis: {}", e);
                 metrics::REDIS_ERRORS
                     .with_label_values(&[&book.symbol])
                     .inc();
             }
         }
 
-        // Write to shared memory for ultra-low latency local consumers
-        if let Err(e) = self.shm_ring.write(payload.as_bytes()) {
+        // 2. Create simplified market data and store in market_data:SYMBOL key
+        let best_bid = book.bids.iter().next_back().map(|(p, _)| p.0).unwrap_or(0.0);
+        let best_ask = book.asks.iter().next().map(|(p, _)| p.0).unwrap_or(0.0);
+        let last_price = if best_bid > 0.0 && best_ask > 0.0 {
+            (best_bid + best_ask) / 2.0
+        } else {
+            0.0
+        };
+
+        let market_data = MarketData {
+            symbol: book.symbol.clone(),
+            last_price,
+            bid_price: best_bid,
+            ask_price: best_ask,
+            volume_24h: 0.0, // TODO: Track from trades
+            high_24h: 0.0,   // TODO: Track from trades
+            low_24h: 0.0,    // TODO: Track from trades
+            updated_at: chrono::Utc::now().to_rfc3339(),
+        };
+
+        let market_data_payload = serde_json::to_string(&market_data)
+            .context("Failed to serialize market data")?;
+
+        // Store in Redis key with 5 minute expiration
+        let market_data_key = format!("market_data:{}", book.symbol);
+        match self.set_redis(&market_data_key, &market_data_payload, 300).await {
+            Ok(_) => {
+                debug!("Stored market data for {} in Redis key", book.symbol);
+            }
+            Err(e) => {
+                error!("Failed to store market data in Redis: {}", e);
+                metrics::REDIS_ERRORS
+                    .with_label_values(&[&book.symbol])
+                    .inc();
+            }
+        }
+
+        // 3. Publish to market_data:SYMBOL channel for dashboard aggregator
+        let market_data_channel = format!("market_data:{}", book.symbol);
+        match self.publish_redis(&market_data_channel, &market_data_payload).await {
+            Ok(_) => {
+                metrics::REDIS_PUBLISHES
+                    .with_label_values(&[&book.symbol, "market_data"])
+                    .inc();
+            }
+            Err(e) => {
+                error!("Failed to publish market data to Redis: {}", e);
+            }
+        }
+
+        // 4. Write full orderbook to shared memory for ultra-low latency local consumers
+        if let Err(e) = self.shm_ring.write(orderbook_payload.as_bytes()) {
             error!("Failed to write to shared memory: {}", e);
         }
 
-        debug!("Published order book for {}", book.symbol);
+        debug!("Published order book and market data for {}", book.symbol);
         Ok(())
     }
 
@@ -89,9 +152,17 @@ impl Publisher {
 
     async fn publish_redis(&self, channel: &str, payload: &str) -> Result<()> {
         let mut conn = self.redis_conn.write().await;
-        conn.publish(channel, payload)
+        conn.publish::<_, _, ()>(channel, payload)
             .await
             .context("Redis publish failed")?;
+        Ok(())
+    }
+
+    async fn set_redis(&self, key: &str, value: &str, ttl_seconds: u64) -> Result<()> {
+        let mut conn = self.redis_conn.write().await;
+        conn.set_ex::<_, _, ()>(key, value, ttl_seconds)
+            .await
+            .context("Redis SET failed")?;
         Ok(())
     }
 

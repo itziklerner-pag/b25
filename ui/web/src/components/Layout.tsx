@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { useTheme } from '@/components/ThemeProvider';
 import { Button } from '@/components/ui/button';
 import { ConnectionStatus } from '@/components/ConnectionStatus';
+import { DebugPanel } from '@/components/DebugPanel';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -126,6 +127,9 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Debug Panel - visible in all environments */}
+      <DebugPanel />
     </div>
   );
 }

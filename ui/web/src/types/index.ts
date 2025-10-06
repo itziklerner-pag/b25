@@ -12,6 +12,18 @@ export interface PriceLevel {
   volume: number;
 }
 
+// Market data from WebSocket
+export interface MarketData {
+  last_price: number;
+  bid?: number;
+  ask?: number;
+  high_24h?: number;
+  low_24h?: number;
+  volume_24h?: number;
+  price_change_24h?: number;
+  timestamp?: number;
+}
+
 export interface Position {
   symbol: string;
   side: 'LONG' | 'SHORT';
@@ -80,6 +92,7 @@ export interface OrderRequest {
 export interface WebSocketMessage {
   type: string;
   data?: any;
+  changes?: any;
   timestamp?: number;
   channel?: string;
 }

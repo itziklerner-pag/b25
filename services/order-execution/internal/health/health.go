@@ -184,9 +184,25 @@ func (h *HealthChecker) GetLastCheck() *Response {
 	return h.lastCheck
 }
 
+// setCORSHeaders sets CORS headers for health endpoints
+func setCORSHeaders(w http.ResponseWriter) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+}
+
 // HTTPHandler returns an HTTP handler for health checks
 func (h *HealthChecker) HTTPHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Set CORS headers
+		setCORSHeaders(w)
+
+		// Handle OPTIONS preflight request
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
 		ctx := r.Context()
 		response := h.Check(ctx)
 
@@ -209,6 +225,15 @@ func (h *HealthChecker) HTTPHandler() http.HandlerFunc {
 // ReadinessHandler returns a readiness probe handler
 func (h *HealthChecker) ReadinessHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Set CORS headers
+		setCORSHeaders(w)
+
+		// Handle OPTIONS preflight request
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
 		ctx := r.Context()
 		response := h.Check(ctx)
 
@@ -226,6 +251,15 @@ func (h *HealthChecker) ReadinessHandler() http.HandlerFunc {
 // LivenessHandler returns a liveness probe handler
 func (h *HealthChecker) LivenessHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Set CORS headers
+		setCORSHeaders(w)
+
+		// Handle OPTIONS preflight request
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
 		// Liveness is very simple - just check if we can respond
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("alive"))

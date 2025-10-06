@@ -1,0 +1,46 @@
+[Unit]
+Description=Market Data Service - Real-time market data ingestion and distribution
+Documentation=https://github.com/your-org/b25
+After=network.target docker.service redis.service
+Requires=docker.service
+Wants=redis.service
+
+[Service]
+Type=simple
+User=mm
+Group=mm
+WorkingDirectory=/home/mm/dev/b25/services/market-data
+
+# Main service
+ExecStart=/home/mm/dev/b25/services/market-data/target/release/market-data-service
+
+# Restart policy
+Restart=on-failure
+RestartSec=5s
+StartLimitIntervalSec=120s
+StartLimitBurst=5
+
+# Resource limits (prevent runaway processes)
+CPUQuota=50%
+MemoryLimit=512M
+MemoryHigh=256M
+TasksMax=100
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=market-data
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/tmp
+
+# Environment
+Environment="RUST_LOG=info"
+Environment="RUST_BACKTRACE=1"
+
+[Install]
+WantedBy=multi-user.target

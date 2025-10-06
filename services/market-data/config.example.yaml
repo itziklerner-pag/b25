@@ -1,6 +1,7 @@
 # Market Data Service Configuration
+# Copy this file to config.yaml and customize for your environment
 
-# Symbols to subscribe to
+# Symbols to subscribe to (Binance Futures)
 symbols:
   - BTCUSDT
   - ETHUSDT
@@ -10,18 +11,30 @@ symbols:
 # Exchange WebSocket URL (Binance Futures)
 exchange_ws_url: "wss://fstream.binance.com/stream"
 
-# Redis connection for pub/sub
-redis_url: "redis://127.0.0.1:6379"
+# Exchange REST API URL (for order book snapshots)
+exchange_rest_url: "https://fapi.binance.com"
 
-# Order book depth to maintain
+# Redis connection for pub/sub
+# Change to your Redis server address
+redis_url: "redis://localhost:6379"
+
+# Order book depth to maintain (levels per side)
+# Smaller = lower memory, faster updates
+# Larger = more market depth visibility
 order_book_depth: 20
 
 # Health check and metrics HTTP port
-health_port: 9090
+# Must be available (not used by other services)
+health_port: 8080
 
 # Shared memory name for local IPC
+# Change if running multiple instances
 shm_name: "market_data_shm"
 
 # Reconnection settings
+# Initial delay after disconnect (milliseconds)
 reconnect_delay_ms: 1000
+
+# Maximum delay between reconnection attempts (milliseconds)
+# Uses exponential backoff up to this limit
 max_reconnect_delay_ms: 60000

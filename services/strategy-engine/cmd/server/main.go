@@ -84,11 +84,27 @@ func main() {
 	log.Info("Strategy engine exited")
 }
 
+// setCORSHeaders sets CORS headers for health endpoints
+func setCORSHeaders(w http.ResponseWriter) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+}
+
 func startHTTPServer(cfg *config.Config, log *logger.Logger, eng *engine.Engine) *http.Server {
 	mux := http.NewServeMux()
 
 	// Health check endpoint
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		// Set CORS headers
+		setCORSHeaders(w)
+
+		// Handle OPTIONS preflight request
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"healthy","service":"strategy-engine"}`))
@@ -96,6 +112,15 @@ func startHTTPServer(cfg *config.Config, log *logger.Logger, eng *engine.Engine)
 
 	// Readiness check endpoint
 	mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
+		// Set CORS headers
+		setCORSHeaders(w)
+
+		// Handle OPTIONS preflight request
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"ready"}`))
@@ -108,6 +133,15 @@ func startHTTPServer(cfg *config.Config, log *logger.Logger, eng *engine.Engine)
 
 	// Status endpoint
 	mux.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
+		// Set CORS headers
+		setCORSHeaders(w)
+
+		// Handle OPTIONS preflight request
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 
 		metrics := eng.GetMetrics()

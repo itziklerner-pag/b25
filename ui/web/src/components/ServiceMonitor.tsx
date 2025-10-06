@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -20,8 +21,10 @@ import {
   Zap,
   Search,
   RefreshCw,
+  ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { logger } from '@/utils/logger';
 
 export interface ServiceMetrics {
   name: string;
@@ -41,6 +44,7 @@ export interface ServiceMetrics {
     p95?: number;
     p99?: number;
   };
+  detailsRoute?: string; // NEW: Route to detailed page
 }
 
 type ServiceType = 'all' | 'trading' | 'infrastructure' | 'support';
@@ -49,66 +53,67 @@ const SERVICE_CONFIGS: ServiceMetrics[] = [
   {
     name: 'Market Data Service',
     type: 'trading',
-    url: 'http://localhost:8080',
+    url: 'https://mm.itziklerner.com/services/market-data/health',
     port: 8080,
     status: 'unknown',
+    detailsRoute: '/services/market-data',
   },
   {
     name: 'Order Execution Service',
     type: 'trading',
-    url: 'http://localhost:8081',
+    url: 'https://mm.itziklerner.com/services/order-execution/health',
     port: 8081,
     status: 'unknown',
   },
   {
     name: 'Strategy Engine',
     type: 'trading',
-    url: 'http://localhost:8082',
+    url: 'https://mm.itziklerner.com/services/strategy-engine/health',
     port: 8082,
     status: 'unknown',
   },
   {
     name: 'Risk Manager',
     type: 'trading',
-    url: 'http://localhost:8083',
+    url: 'https://mm.itziklerner.com/services/risk-manager/health',
     port: 8083,
     status: 'unknown',
   },
   {
     name: 'Account Monitor',
     type: 'trading',
-    url: 'http://localhost:8084',
+    url: 'https://mm.itziklerner.com/services/api-gateway/health', // Check via gateway since no direct health endpoint
     port: 8084,
     status: 'unknown',
   },
   {
     name: 'Configuration Service',
     type: 'support',
-    url: 'http://localhost:8085',
+    url: 'https://mm.itziklerner.com/services/configuration/health',
     port: 8085,
     status: 'unknown',
   },
   {
     name: 'Dashboard Server',
     type: 'support',
-    url: 'http://localhost:8086',
+    url: 'https://mm.itziklerner.com/services/dashboard-server/health',
     port: 8086,
     status: 'unknown',
   },
   {
     name: 'API Gateway',
     type: 'support',
-    url: 'http://localhost:8000',
+    url: 'https://mm.itziklerner.com/services/api-gateway/health',
     port: 8000,
     status: 'unknown',
   },
-  {
-    name: 'Auth Service',
-    type: 'support',
-    url: 'http://localhost:9097',
-    port: 9097,
-    status: 'unknown',
-  },
+  // {
+  //   name: 'Auth Service',
+  //   type: 'support',
+  //   url: 'https://mm.itziklerner.com/services/auth-service/health',
+  //   port: 9097,
+  //   status: 'unknown',
+  // },
   {
     name: 'Redis',
     type: 'infrastructure',
@@ -140,14 +145,14 @@ const SERVICE_CONFIGS: ServiceMetrics[] = [
   {
     name: 'Prometheus',
     type: 'infrastructure',
-    url: 'http://localhost:9090',
+    url: 'https://mm.itziklerner.com/services/prometheus/-/healthy', // Prometheus uses /-/healthy endpoint
     port: 9090,
     status: 'unknown',
   },
   {
     name: 'Grafana',
     type: 'infrastructure',
-    url: 'http://localhost:3001',
+    url: 'https://mm.itziklerner.com/services/grafana-internal/health',
     port: 3001,
     status: 'unknown',
   },
@@ -218,6 +223,7 @@ const formatUptime = (seconds: number): string => {
 };
 
 export default function ServiceMonitor() {
+  const navigate = useNavigate();
   const [services, setServices] = useState<ServiceMetrics[]>(SERVICE_CONFIGS);
   const [filterType, setFilterType] = useState<ServiceType>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -233,7 +239,7 @@ export default function ServiceMonitor() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-        const response = await fetch(`${service.url}/health`, {
+        const response = await fetch(service.url, {
           signal: controller.signal,
           headers: { 'Accept': 'application/json' },
         });
@@ -243,6 +249,11 @@ export default function ServiceMonitor() {
 
         if (response.ok) {
           const data = await response.json().catch(() => ({}));
+
+          logger.debug('ServiceMonitor', `Health check successful for ${service.name}`, {
+            status: data.status,
+            responseTime,
+          });
 
           return {
             ...service,
@@ -261,6 +272,11 @@ export default function ServiceMonitor() {
             },
           };
         } else {
+          logger.warn('ServiceMonitor', `Health check failed for ${service.name}`, {
+            status: response.status,
+            responseTime,
+          });
+
           return {
             ...service,
             status: 'unhealthy',
@@ -271,6 +287,7 @@ export default function ServiceMonitor() {
       } else {
         // For non-HTTP services (Redis, NATS, etc.), we can't directly check
         // In production, you'd have a service that monitors these
+        logger.debug('ServiceMonitor', `Cannot check non-HTTP service: ${service.name}`);
         return {
           ...service,
           status: 'unknown',
@@ -279,6 +296,7 @@ export default function ServiceMonitor() {
         };
       }
     } catch (error) {
+      logger.error('ServiceMonitor', `Health check error for ${service.name}`, error);
       return {
         ...service,
         status: 'unhealthy',
@@ -290,6 +308,7 @@ export default function ServiceMonitor() {
 
   const refreshAllServices = useCallback(async () => {
     setIsRefreshing(true);
+    logger.info('ServiceMonitor', 'Refreshing all services');
 
     try {
       const updatedServices = await Promise.all(
@@ -297,17 +316,21 @@ export default function ServiceMonitor() {
       );
       setServices(updatedServices);
       setLastRefresh(Date.now());
+      logger.info('ServiceMonitor', 'Services refreshed successfully', {
+        total: updatedServices.length,
+        healthy: updatedServices.filter(s => s.status === 'healthy').length,
+      });
     } catch (error) {
-      console.error('Error refreshing services:', error);
+      logger.error('ServiceMonitor', 'Error refreshing services', error);
     } finally {
       setIsRefreshing(false);
     }
   }, [services, checkServiceHealth]);
 
-  // Auto-refresh every 10 seconds
+  // Auto-refresh every 30 seconds to avoid rate limiting
   useEffect(() => {
     refreshAllServices();
-    const interval = setInterval(refreshAllServices, 10000);
+    const interval = setInterval(refreshAllServices, 30000);
     return () => clearInterval(interval);
   }, [refreshAllServices]);
 
@@ -333,6 +356,13 @@ export default function ServiceMonitor() {
       {} as Record<string, number>
     );
   }, [services]);
+
+  const handleServiceClick = (service: ServiceMetrics) => {
+    if (service.detailsRoute) {
+      logger.info('ServiceMonitor', 'Navigating to service details', { service: service.name });
+      navigate(service.detailsRoute);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -422,28 +452,34 @@ export default function ServiceMonitor() {
         </CardHeader>
         <CardContent>
           <div className="text-xs text-muted-foreground mb-4">
-            Last updated: {new Date(lastRefresh).toLocaleTimeString()} • Auto-refresh: 10s
+            Last updated: {new Date(lastRefresh).toLocaleTimeString()} • Auto-refresh: 30s
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filteredServices.map((service) => {
               const Icon = getServiceIcon(service.name, service.type);
               const StatusIcon = getStatusIcon(service.status);
+              const hasDetailsPage = !!service.detailsRoute;
 
               return (
                 <Card
                   key={service.name}
                   className={cn(
-                    'border-2 transition-all hover:shadow-md',
-                    getStatusColor(service.status)
+                    'border-2 transition-all',
+                    getStatusColor(service.status),
+                    hasDetailsPage && 'cursor-pointer hover:shadow-lg hover:scale-[1.02]'
                   )}
+                  onClick={() => hasDetailsPage && handleServiceClick(service)}
                 >
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2">
                         <Icon className="h-5 w-5" />
                         <div>
-                          <div className="font-semibold text-sm">{service.name}</div>
+                          <div className="font-semibold text-sm flex items-center gap-1">
+                            {service.name}
+                            {hasDetailsPage && <ChevronRight className="h-3 w-3 text-muted-foreground" />}
+                          </div>
                           <div className="text-xs text-muted-foreground capitalize">
                             {service.type}
                             {service.port && ` • :${service.port}`}
@@ -530,6 +566,15 @@ export default function ServiceMonitor() {
                     {service.lastCheck && (
                       <div className="text-xs text-muted-foreground border-t pt-2">
                         Last check: {new Date(service.lastCheck).toLocaleTimeString()}
+                      </div>
+                    )}
+
+                    {hasDetailsPage && (
+                      <div className="border-t pt-2">
+                        <div className="text-xs text-muted-foreground flex items-center gap-1">
+                          Click for detailed monitoring
+                          <ChevronRight className="h-3 w-3" />
+                        </div>
                       </div>
                     )}
                   </CardContent>

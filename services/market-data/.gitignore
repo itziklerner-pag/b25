@@ -1,18 +1,24 @@
-# Rust
-target/
+# Rust build artifacts
+/target/
 Cargo.lock
-**/*.rs.bk
 
-# Config
+# Runtime configuration (contains environment-specific settings)
 config.yaml
 
-# IDE
-.idea/
-.vscode/
+# Logs
+*.log
+/tmp/
+
+# Deployment info
+deployment-info.txt
+
+# Editor files
 *.swp
 *.swo
 *~
+.vscode/
+.idea/
 
-# OS
+# OS files
 .DS_Store
 Thumbs.db

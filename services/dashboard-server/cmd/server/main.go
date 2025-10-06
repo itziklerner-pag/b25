@@ -43,8 +43,14 @@ func main() {
 		Str("log_level", level.String()).
 		Msg("Starting Dashboard Server Service")
 
-	// Create state aggregator
-	stateAggregator := aggregator.NewAggregator(logger, config.RedisURL)
+	// Create state aggregator with service connections
+	aggConfig := aggregator.Config{
+		RedisURL:            config.RedisURL,
+		OrderServiceGRPC:    config.OrderServiceGRPC,
+		StrategyServiceHTTP: config.StrategyServiceHTTP,
+		AccountServiceGRPC:  config.AccountServiceGRPC,
+	}
+	stateAggregator := aggregator.NewAggregator(logger, aggConfig)
 	if err := stateAggregator.Start(); err != nil {
 		logger.Fatal().Err(err).Msg("Failed to start state aggregator")
 	}
@@ -62,6 +68,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", wsServer.HandleWebSocket)
 	mux.HandleFunc("/health", handleHealth)
+	mux.HandleFunc("/debug", wsServer.HandleDebug)
 	mux.HandleFunc("/api/v1/history", wsServer.HandleHistory)
 	mux.Handle("/metrics", promhttp.Handler())
 
@@ -94,6 +101,8 @@ func main() {
 
 	logger.Info().
 		Int("port", config.Port).
+		Str("order_service", config.OrderServiceGRPC).
+		Str("strategy_service", config.StrategyServiceHTTP).
 		Msg("Dashboard Server started successfully")
 
 	if err := httpServer.ListenAndServe(); err != http.ErrServerClosed {
@@ -104,27 +113,47 @@ func main() {
 }
 
 type Config struct {
-	Port     int
-	LogLevel string
-	RedisURL string
+	Port                int
+	LogLevel            string
+	RedisURL            string
+	OrderServiceGRPC    string
+	StrategyServiceHTTP string
+	AccountServiceGRPC  string
 }
 
 func loadConfig() (*Config, error) {
-	viper.SetDefault("port", 8080)
+	viper.SetDefault("port", 8086)
 	viper.SetDefault("log_level", "info")
 	viper.SetDefault("redis_url", "localhost:6379")
+	viper.SetDefault("order_service_grpc", "localhost:50051")
+	viper.SetDefault("strategy_service_http", "http://localhost:8082")
+	viper.SetDefault("account_service_grpc", "localhost:50055")
 
 	viper.SetEnvPrefix("DASHBOARD")
 	viper.AutomaticEnv()
 
 	return &Config{
-		Port:     viper.GetInt("port"),
-		LogLevel: viper.GetString("log_level"),
-		RedisURL: viper.GetString("redis_url"),
+		Port:                viper.GetInt("port"),
+		LogLevel:            viper.GetString("log_level"),
+		RedisURL:            viper.GetString("redis_url"),
+		OrderServiceGRPC:    viper.GetString("order_service_grpc"),
+		StrategyServiceHTTP: viper.GetString("strategy_service_http"),
+		AccountServiceGRPC:  viper.GetString("account_service_grpc"),
 	}, nil
 }
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {
+	// Set CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	// Handle OPTIONS preflight request
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"ok","service":"dashboard-server"}`))

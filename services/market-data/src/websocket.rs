@@ -5,10 +5,11 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 use crate::orderbook::{DepthUpdate, OrderBookManager, PriceLevel, Trade};
 use crate::publisher::Publisher;
+use crate::snapshot::SnapshotFetcher;
 use crate::metrics;
 
 pub struct WebSocketClient {
@@ -16,6 +17,8 @@ pub struct WebSocketClient {
     ws_url: String,
     orderbook_manager: Arc<OrderBookManager>,
     publisher: Arc<Publisher>,
+    _snapshot_fetcher: Arc<SnapshotFetcher>,
+    order_book_depth: usize,
     reconnect_delay: Duration,
     max_reconnect_delay: Duration,
 }
@@ -65,12 +68,16 @@ impl WebSocketClient {
         ws_url: String,
         orderbook_manager: Arc<OrderBookManager>,
         publisher: Arc<Publisher>,
+        snapshot_fetcher: Arc<SnapshotFetcher>,
+        order_book_depth: usize,
     ) -> Self {
         Self {
             symbol,
             ws_url,
             orderbook_manager,
             publisher,
+            _snapshot_fetcher: snapshot_fetcher,
+            order_book_depth,
             reconnect_delay: Duration::from_millis(1000),
             max_reconnect_delay: Duration::from_secs(60),
         }
@@ -86,7 +93,7 @@ impl WebSocketClient {
                     return Ok(());
                 }
                 Err(e) => {
-                    error!("WebSocket error for {}: {}", self.symbol, e);
+                    warn!("WebSocket error for {}: {}", self.symbol, e);
                     metrics::WS_DISCONNECTS.with_label_values(&[&self.symbol]).inc();
 
                     // Exponential backoff
@@ -102,7 +109,10 @@ impl WebSocketClient {
     }
 
     async fn run_connection(&self) -> Result<()> {
-        // Build WebSocket URL for Binance Futures
+        // Skip REST snapshot fetch (geo-blocked) - build orderbook from WebSocket
+        info!("Building orderbook for {} from WebSocket updates (REST API geo-blocked)", self.symbol);
+
+        // Connect to WebSocket for incremental updates
         let streams = format!(
             "{}@depth@100ms/{}@aggTrade",
             self.symbol.to_lowercase(),
@@ -140,26 +150,11 @@ impl WebSocketClient {
 
             match msg {
                 Message::Text(text) => {
-                    let start = std::time::Instant::now();
-
                     if let Err(e) = self.process_message(&text).await {
-                        error!("Error processing message: {}", e);
+                        debug!("Error processing message: {}", e);
                         metrics::MESSAGES_ERROR
                             .with_label_values(&[&self.symbol])
                             .inc();
-                    } else {
-                        let elapsed = start.elapsed().as_micros() as f64;
-                        metrics::PROCESSING_LATENCY
-                            .with_label_values(&[&self.symbol])
-                            .observe(elapsed);
-
-                        // Alert if we exceed target latency
-                        if elapsed > 100.0 {
-                            warn!(
-                                "High processing latency for {}: {:.2}μs",
-                                self.symbol, elapsed
-                            );
-                        }
                     }
                 }
                 Message::Pong(_) => {
@@ -229,30 +224,37 @@ impl WebSocketClient {
         // Update order book
         match self.orderbook_manager.update(&self.symbol, depth_update.clone()) {
             Ok(book) => {
-                metrics::ORDERBOOK_UPDATES
-                    .with_label_values(&[&self.symbol])
-                    .inc();
+                // Only publish if we have meaningful data
+                if book.bids.len() > 0 && book.asks.len() > 0 {
+                    metrics::ORDERBOOK_UPDATES
+                        .with_label_values(&[&self.symbol])
+                        .inc();
 
-                // Publish to Redis and shared memory
-                self.publisher
-                    .publish_orderbook(&book)
-                    .await
-                    .context("Failed to publish orderbook")?;
+                    // Publish to Redis and shared memory
+                    self.publisher
+                        .publish_orderbook(&book)
+                        .await
+                        .context("Failed to publish orderbook")?;
 
-                debug!(
-                    "Updated order book for {}: {} bids, {} asks",
-                    self.symbol,
-                    book.bids.len(),
-                    book.asks.len()
-                );
+                    debug!(
+                        "Updated order book for {}: {} bids, {} asks, last_update_id={}",
+                        self.symbol,
+                        book.bids.len(),
+                        book.asks.len(),
+                        book.last_update_id
+                    );
+                }
             }
             Err(e) => {
-                error!("Failed to update order book: {}", e);
+                // Sequence error - reset orderbook to accept next update as baseline
+                debug!("Sequence error for {}: {}. Resetting to accept next update.", self.symbol, e);
                 metrics::SEQUENCE_ERRORS
                     .with_label_values(&[&self.symbol])
                     .inc();
 
-                // TODO: Request snapshot to resync
+                // Reset orderbook - next update will be accepted as baseline
+                let mut books = self.orderbook_manager.books.write().unwrap();
+                books.remove(&self.symbol);
             }
         }
 

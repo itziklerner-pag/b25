@@ -75,9 +75,10 @@ func (b *Broadcaster) RegisterClient(id string, clientType types.ClientType, sen
 		Subscriptions: make(map[string]bool),
 	}
 
-	b.logger.Debug().
+	b.logger.Info().
 		Str("client_id", id).
 		Str("type", clientType.String()).
+		Str("format", format.String()).
 		Msg("Client registered with broadcaster")
 }
 
@@ -155,40 +156,51 @@ func (b *Broadcaster) broadcastToClients(clientType types.ClientType, sequence u
 	defer b.clientsMu.RUnlock()
 
 	notifiedCount := 0
+	clientCount := 0
+	updatesSent := 0
+	snapshotsSent := 0
+	skippedNoChange := 0
 
 	for _, client := range b.clients {
 		if client.Type != clientType {
 			continue
 		}
+		clientCount++
 
-		// Check if client has subscriptions
-		if len(client.Subscriptions) == 0 {
-			continue
-		}
-
-		// Filter state based on subscriptions
+		// Filter state based on subscriptions (or send all if no subscriptions)
 		filteredState := b.filterStateBySubscriptions(currentState, client.Subscriptions)
 
 		// Generate differential update if possible
 		var message []byte
 		var err error
+		var messageType string
+		var diffCount int
 
-		if client.LastState != nil && b.hasStateChanged(client.LastState, filteredState) {
+		if client.LastState != nil {
+			// FIXED: Always compute diff and check if there are actual changes
 			diff := b.computeDiff(client.LastState, filteredState)
-			if len(diff) > 0 {
+			diffCount = len(diff)
+			if diffCount > 0 {
+				// Send incremental update with changes
 				msg := types.ServerMessage{
-					Type:      "update",
+					Type:      "snapshot",  // Always send full snapshot
 					Sequence:  sequence,
 					Timestamp: time.Now(),
-					Changes:   diff,
+					Data: filteredState,  // Send full state instead of diff
 				}
 				message, err = b.serializeMessage(client.Format, msg)
+				messageType = "update"
 				if err == nil {
 					metrics.RecordMessageSent(client.Type.String(), "update")
 					metrics.RecordMessageSize(client.Format.String(), "update", len(message))
+					updatesSent++
 				}
+			} else {
+				// No changes detected, skip this client
+				skippedNoChange++
+				continue
 			}
-		} else if client.LastState == nil {
+		} else {
 			// Send full snapshot for first update
 			msg := types.ServerMessage{
 				Type:      "snapshot",
@@ -197,9 +209,11 @@ func (b *Broadcaster) broadcastToClients(clientType types.ClientType, sequence u
 				Data:      filteredState,
 			}
 			message, err = b.serializeMessage(client.Format, msg)
+			messageType = "snapshot"
 			if err == nil {
 				metrics.RecordMessageSent(client.Type.String(), "snapshot")
 				metrics.RecordMessageSize(client.Format.String(), "snapshot", len(message))
+				snapshotsSent++
 			}
 		}
 
@@ -213,6 +227,17 @@ func (b *Broadcaster) broadcastToClients(clientType types.ClientType, sequence u
 			case client.SendChan <- message:
 				client.LastState = filteredState
 				notifiedCount++
+
+				// Log details for debugging
+				if messageType == "update" {
+					b.logger.Debug().
+						Str("client_id", client.ID).
+						Str("client_type", clientType.String()).
+						Uint64("sequence", sequence).
+						Int("changes", diffCount).
+						Int("message_bytes", len(message)).
+						Msg("Sent incremental update to client")
+				}
 			default:
 				b.logger.Warn().Str("client_id", client.ID).Msg("Client send buffer full, dropping message")
 			}
@@ -222,13 +247,18 @@ func (b *Broadcaster) broadcastToClients(clientType types.ClientType, sequence u
 	duration := time.Since(start)
 	metrics.RecordBroadcastLatency(clientType.String(), duration.Seconds())
 
-	if notifiedCount > 0 {
-		b.logger.Debug().
+	// ENHANCED LOGGING: Always log broadcast attempts to help debugging
+	if clientCount > 0 {
+		b.logger.Info().
 			Str("client_type", clientType.String()).
 			Uint64("sequence", sequence).
+			Int("clients_total", clientCount).
 			Int("clients_notified", notifiedCount).
+			Int("updates_sent", updatesSent).
+			Int("snapshots_sent", snapshotsSent).
+			Int("skipped_no_change", skippedNoChange).
 			Dur("duration", duration).
-			Msg("Broadcast completed")
+			Msg("Broadcasting to clients")
 	}
 }
 
@@ -237,32 +267,34 @@ func (b *Broadcaster) filterStateBySubscriptions(state *types.State, subscriptio
 	filtered := &types.State{
 		Timestamp: state.Timestamp,
 		Sequence:  state.Sequence,
+		// Initialize all maps to prevent null in JSON serialization
+		MarketData: make(map[string]*types.MarketData),
+		Orders:     make([]*types.Order, 0),
+		Positions:  make(map[string]*types.Position),
+		Strategies: make(map[string]*types.Strategy),
 	}
 
-	if subscriptions["market_data"] && state.MarketData != nil {
+	// If no subscriptions are set, send ALL data (opt-out instead of opt-in)
+	sendAll := len(subscriptions) == 0
+
+	// Copy data based on subscriptions or send all if no subscriptions
+	if (sendAll || subscriptions["market_data"]) && state.MarketData != nil {
 		filtered.MarketData = state.MarketData
 	}
-	if subscriptions["orders"] && state.Orders != nil {
+	if (sendAll || subscriptions["orders"]) && state.Orders != nil {
 		filtered.Orders = state.Orders
 	}
-	if subscriptions["positions"] && state.Positions != nil {
+	if (sendAll || subscriptions["positions"]) && state.Positions != nil {
 		filtered.Positions = state.Positions
 	}
-	if subscriptions["account"] && state.Account != nil {
+	if (sendAll || subscriptions["account"]) && state.Account != nil {
 		filtered.Account = state.Account
 	}
-	if subscriptions["strategies"] && state.Strategies != nil {
+	if (sendAll || subscriptions["strategies"]) && state.Strategies != nil {
 		filtered.Strategies = state.Strategies
 	}
 
 	return filtered
-}
-
-// hasStateChanged checks if the state has changed
-func (b *Broadcaster) hasStateChanged(oldState, newState *types.State) bool {
-	// Simple timestamp comparison for now
-	// In production, implement more sophisticated change detection
-	return !oldState.Timestamp.Equal(newState.Timestamp)
 }
 
 // computeDiff computes the differences between two states
@@ -323,6 +355,8 @@ func (b *Broadcaster) computeDiff(oldState, newState *types.State) map[string]in
 	// Compare orders count (simplified)
 	if len(oldState.Orders) != len(newState.Orders) {
 		diff["orders.count"] = len(newState.Orders)
+		// Also send the full orders array when count changes
+		diff["orders"] = newState.Orders
 	}
 
 	// Compare strategies

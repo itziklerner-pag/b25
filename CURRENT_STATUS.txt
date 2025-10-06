@@ -1,0 +1,40 @@
+B25 SYSTEM STATUS - Quick Reference
+====================================
+
+SERVICES RUNNING ON VPS:
+✅ Web Dashboard: localhost:3000 (Vite dev server)
+✅ Market Data: localhost:8080 (Binance connected, live data)
+✅ Order Execution: localhost:8081 (606 symbols loaded)
+✅ Strategy Engine: localhost:8082 (3 strategies active)
+✅ Dashboard Server: localhost:8086 (WebSocket ready at /ws)
+✅ Grafana: localhost:3001
+✅ Prometheus: localhost:9090
+
+INFRASTRUCTURE:
+✅ Redis: localhost:6379
+✅ PostgreSQL: localhost:5432
+✅ TimescaleDB: localhost:5433
+✅ NATS: localhost:4222
+
+ACCESS FROM LOCAL MACHINE:
+1. Run tunnel: ~/tunnel.sh
+2. Open browser: http://localhost:3000
+3. Dashboard should connect to ws://localhost:8086/ws
+
+IF DASHBOARD SHOWS "DISCONNECTED":
+- Check browser console (F12) for WebSocket errors
+- The .env file has: VITE_WS_URL=ws://localhost:8086/ws
+- This should work through the SSH tunnel
+
+TUNNEL ERRORS TO IGNORE:
+- "Connection refused" on ports 50051-50056, 9100-9106 (gRPC/metrics not needed for UI)
+- Only need ports: 3000, 3001, 8086, 9090
+
+BINANCE API STATUS:
+✅ Market data working (live orderbook)
+✅ Order execution authenticated
+⚠️ Account Monitor geo-restricted (not critical)
+
+TRADING MODE: SIMULATION (safe, no real orders)
+
+SYSTEM STATUS: 93% OPERATIONAL

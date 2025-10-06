@@ -76,9 +76,16 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse serialization format
+	// Default to JSON for web clients, MessagePack for TUI clients
 	format := types.FormatMessagePack
+	if clientType == types.ClientTypeWeb {
+		format = types.FormatJSON
+	}
+	// Allow explicit override via format parameter
 	if r.URL.Query().Get("format") == "json" {
 		format = types.FormatJSON
+	} else if r.URL.Query().Get("format") == "msgpack" {
+		format = types.FormatMessagePack
 	}
 
 	client := s.createClient(conn, clientType, format)
@@ -121,6 +128,38 @@ func (s *Server) HandleHistory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(response)
+}
+
+func (s *Server) HandleDebug(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	state := s.aggregator.GetFullState()
+
+	s.logger.Info().
+		Int("market_data_count", len(state.MarketData)).
+		Int("strategies_count", len(state.Strategies)).
+		Int("positions_count", len(state.Positions)).
+		Int("orders_count", len(state.Orders)).
+		Msg("Debug endpoint called")
+
+	// Create debug response with detailed info
+	debugInfo := map[string]interface{}{
+		"timestamp": state.Timestamp,
+		"sequence":  state.Sequence,
+		"counts": map[string]int{
+			"market_data": len(state.MarketData),
+			"strategies":  len(state.Strategies),
+			"positions":   len(state.Positions),
+			"orders":      len(state.Orders),
+		},
+		"market_data": state.MarketData,
+		"strategies":  state.Strategies,
+		"positions":   state.Positions,
+		"orders":      state.Orders,
+		"account":     state.Account,
+	}
+
+	json.NewEncoder(w).Encode(debugInfo)
 }
 
 func (s *Server) createClient(conn *websocket.Conn, clientType types.ClientType, format types.SerializationFormat) *Client {
@@ -201,7 +240,14 @@ func (s *Server) clientWriter(client *Client) {
 			return
 		case message := <-client.SendChan:
 			client.Conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-			if err := client.Conn.WriteMessage(websocket.BinaryMessage, message); err != nil {
+
+			// Use TextMessage for JSON, BinaryMessage for MessagePack
+			messageType := websocket.BinaryMessage
+			if client.Format == types.FormatJSON {
+				messageType = websocket.TextMessage
+			}
+
+			if err := client.Conn.WriteMessage(messageType, message); err != nil {
 				s.logger.Error().Err(err).Str("client_id", client.ID).Msg("WebSocket write error")
 				return
 			}
@@ -270,7 +316,24 @@ func (s *Server) handleUnsubscribe(client *Client, channels []string) {
 
 func (s *Server) handleRefresh(client *Client) {
 	state := s.aggregator.GetFullState()
+
+	s.logger.Debug().
+		Str("client_id", client.ID).
+		Int("market_data_count", len(state.MarketData)).
+		Int("strategies_count", len(state.Strategies)).
+		Int("positions_count", len(state.Positions)).
+		Int("orders_count", len(state.Orders)).
+		Int("subscription_count", len(client.Subscriptions)).
+		Msg("Handling refresh request")
+
 	filteredState := s.filterStateBySubscriptions(state, client.Subscriptions)
+
+	s.logger.Debug().
+		Str("client_id", client.ID).
+		Int("filtered_market_data", len(filteredState.MarketData)).
+		Int("filtered_strategies", len(filteredState.Strategies)).
+		Msg("State filtered by subscriptions")
+
 	s.sendFullState(client, filteredState)
 }
 
@@ -278,21 +341,31 @@ func (s *Server) filterStateBySubscriptions(state *types.State, subscriptions ma
 	filtered := &types.State{
 		Timestamp: state.Timestamp,
 		Sequence:  state.Sequence,
+		// Initialize all maps to prevent null in JSON serialization
+		MarketData: make(map[string]*types.MarketData),
+		Orders:     make([]*types.Order, 0),
+		Positions:  make(map[string]*types.Position),
+		Strategies: make(map[string]*types.Strategy),
 	}
 
-	if subscriptions["market_data"] {
+	// FIX: If no subscriptions are set, send ALL data (opt-out instead of opt-in)
+	// This fixes the bug where clients with empty subscriptions get empty maps
+	sendAll := len(subscriptions) == 0
+
+	// Copy data based on subscriptions or send all if no subscriptions
+	if (sendAll || subscriptions["market_data"]) && state.MarketData != nil {
 		filtered.MarketData = state.MarketData
 	}
-	if subscriptions["orders"] {
+	if (sendAll || subscriptions["orders"]) && state.Orders != nil {
 		filtered.Orders = state.Orders
 	}
-	if subscriptions["positions"] {
+	if (sendAll || subscriptions["positions"]) && state.Positions != nil {
 		filtered.Positions = state.Positions
 	}
-	if subscriptions["account"] {
+	if (sendAll || subscriptions["account"]) && state.Account != nil {
 		filtered.Account = state.Account
 	}
-	if subscriptions["strategies"] {
+	if (sendAll || subscriptions["strategies"]) && state.Strategies != nil {
 		filtered.Strategies = state.Strategies
 	}
 
@@ -312,6 +385,13 @@ func (s *Server) sendFullState(client *Client, state *types.State) {
 		s.logger.Error().Err(err).Str("client_id", client.ID).Msg("Failed to serialize full state")
 		return
 	}
+
+	s.logger.Debug().
+		Str("client_id", client.ID).
+		Int("message_size", len(message)).
+		Int("market_data_count", len(state.MarketData)).
+		Int("strategies_count", len(state.Strategies)).
+		Msg("Sending snapshot message to client")
 
 	select {
 	case client.SendChan <- message:

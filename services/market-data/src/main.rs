@@ -5,6 +5,7 @@ mod websocket;
 mod metrics;
 mod shm;
 mod health;
+mod snapshot;
 
 use anyhow::Result;
 use std::sync::Arc;
@@ -17,6 +18,7 @@ use crate::orderbook::OrderBookManager;
 use crate::publisher::Publisher;
 use crate::websocket::WebSocketClient;
 use crate::health::HealthServer;
+use crate::snapshot::SnapshotFetcher;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -49,6 +51,9 @@ async fn main() -> Result<()> {
             .expect("Failed to initialize publisher")
     );
 
+    // Initialize snapshot fetcher
+    let snapshot_fetcher = Arc::new(SnapshotFetcher::new(config.exchange_rest_url.clone()));
+
     // Start health check server
     let health_server = HealthServer::new(config.health_port);
     let health_handle = tokio::spawn(async move {
@@ -65,6 +70,8 @@ async fn main() -> Result<()> {
         let ws_url = config.exchange_ws_url.clone();
         let orderbook_manager = Arc::clone(&orderbook_manager);
         let publisher = Arc::clone(&publisher);
+        let snapshot_fetcher = Arc::clone(&snapshot_fetcher);
+        let order_book_depth = config.order_book_depth;
 
         let handle = tokio::spawn(async move {
             let client = WebSocketClient::new(
@@ -72,6 +79,8 @@ async fn main() -> Result<()> {
                 ws_url,
                 orderbook_manager,
                 publisher,
+                snapshot_fetcher,
+                order_book_depth,
             );
 
             loop {
