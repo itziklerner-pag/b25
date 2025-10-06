@@ -1,0 +1,90 @@
+syntax = "proto3";
+
+package orderexecution;
+
+option go_package = "github.com/b25/strategy-engine/proto/orderexecution";
+
+// OrderExecution service handles order submission and management
+service OrderExecution {
+  // SubmitOrder submits a single order to the execution service
+  rpc SubmitOrder(OrderRequest) returns (OrderResponse);
+
+  // SubmitBatchOrders submits multiple orders in a single request
+  rpc SubmitBatchOrders(BatchOrderRequest) returns (BatchOrderResponse);
+
+  // CancelOrder cancels an existing order
+  rpc CancelOrder(CancelOrderRequest) returns (CancelOrderResponse);
+
+  // GetOrderStatus retrieves the current status of an order
+  rpc GetOrderStatus(OrderStatusRequest) returns (OrderStatusResponse);
+}
+
+// OrderRequest represents a single order submission
+message OrderRequest {
+  string signal_id = 1;
+  string strategy_id = 2;
+  string symbol = 3;
+  string side = 4;  // "buy" or "sell"
+  string order_type = 5;  // "market", "limit", "stop", "stop_limit"
+  double quantity = 6;
+  double price = 7;  // For limit orders
+  double stop_price = 8;  // For stop orders
+  string time_in_force = 9;  // "GTC", "IOC", "FOK"
+  double max_slippage = 10;
+  int32 priority = 11;
+  map<string, string> metadata = 12;
+}
+
+// OrderResponse represents the response to an order submission
+message OrderResponse {
+  string order_id = 1;
+  string signal_id = 2;
+  string status = 3;  // "accepted", "rejected", "pending"
+  string message = 4;
+  int64 timestamp = 5;  // Unix timestamp in microseconds
+  double executed_price = 6;
+  double executed_quantity = 7;
+}
+
+// BatchOrderRequest represents multiple order submissions
+message BatchOrderRequest {
+  repeated OrderRequest orders = 1;
+}
+
+// BatchOrderResponse represents responses to batch order submission
+message BatchOrderResponse {
+  repeated OrderResponse responses = 1;
+  int32 accepted_count = 2;
+  int32 rejected_count = 3;
+}
+
+// CancelOrderRequest represents an order cancellation request
+message CancelOrderRequest {
+  string order_id = 1;
+  string strategy_id = 2;
+  string reason = 3;
+}
+
+// CancelOrderResponse represents the response to an order cancellation
+message CancelOrderResponse {
+  string order_id = 1;
+  string status = 2;  // "cancelled", "failed", "not_found"
+  string message = 3;
+  int64 timestamp = 4;
+}
+
+// OrderStatusRequest requests the status of an order
+message OrderStatusRequest {
+  string order_id = 1;
+}
+
+// OrderStatusResponse provides the current status of an order
+message OrderStatusResponse {
+  string order_id = 1;
+  string status = 2;  // "pending", "open", "filled", "cancelled", "rejected"
+  double filled_quantity = 3;
+  double remaining_quantity = 4;
+  double average_price = 5;
+  int64 timestamp = 6;
+  string message = 7;
+}

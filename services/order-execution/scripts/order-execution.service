@@ -1,0 +1,60 @@
+[Unit]
+Description=Order Execution Service - High-Frequency Trading Order Management
+Documentation=https://github.com/yourusername/b25/tree/main/services/order-execution
+After=network.target redis.service nats.service
+Wants=redis.service nats.service
+PartOf=b25-services.target
+
+[Service]
+Type=simple
+User=appuser
+Group=appuser
+WorkingDirectory=/opt/b25/order-execution
+
+# Environment file with credentials (secure permissions: 600)
+EnvironmentFile=/etc/b25/order-execution/.env
+
+# Service binary
+ExecStart=/opt/b25/order-execution/order-execution
+
+# Restart policy
+Restart=always
+RestartSec=5
+StartLimitInterval=60
+StartLimitBurst=3
+
+# Logging
+StandardOutput=append:/var/log/b25/order-execution/service.log
+StandardError=append:/var/log/b25/order-execution/error.log
+SyslogIdentifier=order-execution
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/b25/order-execution
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+RemoveIPC=true
+PrivateMounts=true
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+MemoryMax=2G
+CPUQuota=200%
+
+# Health checks (requires systemd 240+)
+# Uncomment if your systemd version supports it
+# WatchdogSec=30s
+
+[Install]
+WantedBy=multi-user.target
+Alias=b25-order-execution.service

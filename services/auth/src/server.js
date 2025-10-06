@@ -3,6 +3,7 @@ import { serverConfig } from './config/index.js';
 import { checkDatabaseConnection, runMigrations } from './database/migrations.js';
 import logger from './utils/logger.js';
 import db from './database/pool.js';
+import tokenRepository from './database/repositories/token.repository.js';
 
 async function startServer() {
   try {
@@ -25,9 +26,22 @@ async function startServer() {
       });
     });
 
+    // Token cleanup job - runs daily
+    const cleanupInterval = setInterval(async () => {
+      try {
+        const count = await tokenRepository.cleanupExpired();
+        logger.info('Token cleanup job completed', { deletedTokens: count });
+      } catch (error) {
+        logger.error('Token cleanup job failed', { error: error.message });
+      }
+    }, 24 * 60 * 60 * 1000); // Run every 24 hours
+
     // Graceful shutdown
     const shutdown = async (signal) => {
       logger.info(`Received ${signal}, starting graceful shutdown...`);
+
+      // Clear cleanup interval
+      clearInterval(cleanupInterval);
 
       server.close(async () => {
         logger.info('HTTP server closed');

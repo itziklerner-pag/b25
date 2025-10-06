@@ -1,7 +1,10 @@
 package api
 
 import (
+	"database/sql"
+
 	"github.com/b25/services/configuration/internal/service"
+	"github.com/nats-io/nats.go"
 	"go.uber.org/zap"
 )
 
@@ -9,13 +12,17 @@ import (
 type Handler struct {
 	configService *service.ConfigurationService
 	logger        *zap.Logger
+	db            *sql.DB
+	natsConn      *nats.Conn
 }
 
 // NewHandler creates a new API handler
-func NewHandler(configService *service.ConfigurationService, logger *zap.Logger) *Handler {
+func NewHandler(configService *service.ConfigurationService, logger *zap.Logger, db *sql.DB, natsConn *nats.Conn) *Handler {
 	return &Handler{
 		configService: configService,
 		logger:        logger,
+		db:            db,
+		natsConn:      natsConn,
 	}
 }
 

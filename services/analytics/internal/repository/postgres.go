@@ -423,3 +423,40 @@ func (r *Repository) CleanupOldData(ctx context.Context) error {
 func (r *Repository) GetHealth(ctx context.Context) error {
 	return r.pool.Ping(ctx)
 }
+
+// GetEventCountByTypeInRange returns count for a specific event type in a time range
+func (r *Repository) GetEventCountByTypeInRange(ctx context.Context, eventType string, startTime, endTime time.Time) (int64, error) {
+	query := `
+		SELECT COUNT(*) as count
+		FROM events
+		WHERE event_type = $1 AND timestamp >= $2 AND timestamp <= $3
+	`
+
+	var count int64
+	err := r.pool.QueryRow(ctx, query, eventType, startTime, endTime).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+// GetTotalVolumeInRange calculates total trading volume in a time range
+func (r *Repository) GetTotalVolumeInRange(ctx context.Context, startTime, endTime time.Time) (float64, error) {
+	query := `
+		SELECT COALESCE(SUM(CAST(properties->>'quantity' AS FLOAT) * CAST(properties->>'price' AS FLOAT)), 0) as total_volume
+		FROM events
+		WHERE event_type = 'order.filled'
+		  AND timestamp >= $1 AND timestamp <= $2
+		  AND properties->>'quantity' IS NOT NULL
+		  AND properties->>'price' IS NOT NULL
+	`
+
+	var totalVolume float64
+	err := r.pool.QueryRow(ctx, query, startTime, endTime).Scan(&totalVolume)
+	if err != nil {
+		return 0, err
+	}
+
+	return totalVolume, nil
+}

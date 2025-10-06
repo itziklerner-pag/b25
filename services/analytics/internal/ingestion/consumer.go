@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/b25/analytics/internal/config"
+	"github.com/b25/analytics/internal/metrics"
 	"github.com/b25/analytics/internal/models"
 	"github.com/b25/analytics/internal/repository"
 	"github.com/google/uuid"
@@ -17,16 +18,17 @@ import (
 
 // Consumer handles Kafka event consumption and ingestion
 type Consumer struct {
-	cfg        *config.KafkaConfig
-	ingestionCfg *config.IngestionConfig
-	repo       *repository.Repository
-	logger     *zap.Logger
-	readers    []*kafka.Reader
-	eventChan  chan *models.Event
-	wg         sync.WaitGroup
-	ctx        context.Context
-	cancel     context.CancelFunc
-	metrics    *IngestionMetrics
+	cfg              *config.KafkaConfig
+	ingestionCfg     *config.IngestionConfig
+	repo             *repository.Repository
+	prometheusMetrics *metrics.Metrics
+	logger           *zap.Logger
+	readers          []*kafka.Reader
+	eventChan        chan *models.Event
+	wg               sync.WaitGroup
+	ctx              context.Context
+	cancel           context.CancelFunc
+	metrics          *IngestionMetrics
 }
 
 // IngestionMetrics tracks ingestion performance
@@ -41,18 +43,19 @@ type IngestionMetrics struct {
 }
 
 // NewConsumer creates a new Kafka consumer
-func NewConsumer(cfg *config.KafkaConfig, ingestionCfg *config.IngestionConfig, repo *repository.Repository, logger *zap.Logger) *Consumer {
+func NewConsumer(cfg *config.KafkaConfig, ingestionCfg *config.IngestionConfig, repo *repository.Repository, promMetrics *metrics.Metrics, logger *zap.Logger) *Consumer {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	c := &Consumer{
-		cfg:          cfg,
-		ingestionCfg: ingestionCfg,
-		repo:         repo,
-		logger:       logger,
-		eventChan:    make(chan *models.Event, ingestionCfg.BufferSize),
-		ctx:          ctx,
-		cancel:       cancel,
-		metrics:      &IngestionMetrics{},
+		cfg:              cfg,
+		ingestionCfg:     ingestionCfg,
+		repo:             repo,
+		prometheusMetrics: promMetrics,
+		logger:           logger,
+		eventChan:        make(chan *models.Event, ingestionCfg.BufferSize),
+		ctx:              ctx,
+		cancel:           cancel,
+		metrics:          &IngestionMetrics{},
 	}
 
 	// Create Kafka readers for each topic
@@ -225,6 +228,9 @@ func (c *Consumer) flushBatch(batch []*models.Event, workerID int) {
 		c.metrics.mu.Lock()
 		c.metrics.EventsFailed += int64(len(batch))
 		c.metrics.mu.Unlock()
+
+		// Update Prometheus metrics
+		c.prometheusMetrics.EventsFailed.Add(float64(len(batch)))
 		return
 	}
 
@@ -236,6 +242,11 @@ func (c *Consumer) flushBatch(batch []*models.Event, workerID int) {
 	c.metrics.LastBatchDuration = duration
 	c.metrics.TotalLatency += duration
 	c.metrics.mu.Unlock()
+
+	// Update Prometheus metrics
+	c.prometheusMetrics.EventsIngested.Add(float64(len(batch)))
+	c.prometheusMetrics.BatchesProcessed.Inc()
+	c.prometheusMetrics.BatchDuration.Observe(duration.Seconds())
 
 	c.logger.Debug("Batch inserted successfully",
 		zap.Int("worker_id", workerID),

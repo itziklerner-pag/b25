@@ -43,12 +43,35 @@ func (h *Handler) ReadinessCheck(c *gin.Context) {
 	c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
 	c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
-	// TODO: Add checks for database and NATS connectivity
+	checks := gin.H{}
+	allHealthy := true
+
+	// Check database connectivity
+	if err := h.db.Ping(); err != nil {
+		checks["database"] = "error: " + err.Error()
+		allHealthy = false
+	} else {
+		checks["database"] = "ok"
+	}
+
+	// Check NATS connectivity
+	if h.natsConn == nil || !h.natsConn.IsConnected() {
+		checks["nats"] = "disconnected"
+		allHealthy = false
+	} else {
+		checks["nats"] = "ok"
+	}
+
+	if !allHealthy {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"status": "not_ready",
+			"checks": checks,
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status": "ready",
-		"checks": gin.H{
-			"database": "ok",
-			"nats":     "ok",
-		},
+		"checks": checks,
 	})
 }

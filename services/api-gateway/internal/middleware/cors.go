@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"fmt"
+
 	"github.com/b25/api-gateway/internal/config"
 	"github.com/gin-gonic/gin"
 )
@@ -81,7 +83,7 @@ func (m *CORSMiddleware) Handle() gin.HandlerFunc {
 		}
 
 		if m.config.MaxAge > 0 {
-			c.Header("Access-Control-Max-Age", string(rune(m.config.MaxAge)))
+			c.Header("Access-Control-Max-Age", fmt.Sprintf("%d", m.config.MaxAge))
 		}
 
 		// Handle preflight requests

@@ -124,9 +124,19 @@ dev:
 	@echo "Running in development mode..."
 	@air -c .air.toml || go run ./cmd/server
 
+## proto: Generate protobuf code
+proto:
+	@echo "Generating protobuf code..."
+	@protoc --go_out=. --go_opt=paths=source_relative \
+		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
+		proto/order_execution.proto
+	@echo "Protobuf code generated"
+
 ## install-tools: Install development tools
 install-tools:
 	@echo "Installing development tools..."
 	@go install github.com/cosmtrek/air@latest
 	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	@go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+	@go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 	@echo "Tools installed"

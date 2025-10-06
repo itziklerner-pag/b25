@@ -11,16 +11,24 @@ import (
 	"go.uber.org/zap"
 )
 
+// AccountStateProvider provides account state data
+type AccountStateProvider interface {
+	GetAccountState(ctx context.Context, accountID string) (risk.AccountState, error)
+}
+
 // RiskMonitor continuously monitors risk metrics
 type RiskMonitor struct {
-	logger         *zap.Logger
-	calculator     *risk.Calculator
-	policyEngine   *limits.PolicyEngine
-	repository     *repository.PolicyRepository
-	stopManager    *emergency.StopManager
-	alertPublisher AlertPublisher
-	interval       time.Duration
-	circuitBreaker *emergency.CircuitBreaker
+	logger          *zap.Logger
+	calculator      *risk.Calculator
+	policyEngine    *limits.PolicyEngine
+	repository      *repository.PolicyRepository
+	stopManager     *emergency.StopManager
+	alertPublisher  AlertPublisher
+	interval        time.Duration
+	circuitBreaker  *emergency.CircuitBreaker
+	accountProvider AccountStateProvider
+	accountID       string
+	useMockData     bool
 }
 
 // AlertPublisher publishes alerts
@@ -38,15 +46,26 @@ func NewRiskMonitor(
 	stopManager *emergency.StopManager,
 	alertPublisher AlertPublisher,
 	interval time.Duration,
+	accountProvider AccountStateProvider,
+	accountID string,
 ) *RiskMonitor {
+	useMock := false
+	if accountProvider == nil {
+		logger.Warn("Account Monitor client not provided to risk monitor, using mock data - NOT SAFE FOR PRODUCTION")
+		useMock = true
+	}
+
 	monitor := &RiskMonitor{
-		logger:         logger,
-		calculator:     calculator,
-		policyEngine:   policyEngine,
-		repository:     repository,
-		stopManager:    stopManager,
-		alertPublisher: alertPublisher,
-		interval:       interval,
+		logger:          logger,
+		calculator:      calculator,
+		policyEngine:    policyEngine,
+		repository:      repository,
+		stopManager:     stopManager,
+		alertPublisher:  alertPublisher,
+		interval:        interval,
+		accountProvider: accountProvider,
+		accountID:       accountID,
+		useMockData:     useMock,
 	}
 
 	// Create circuit breaker for emergency stops
@@ -84,8 +103,12 @@ func (m *RiskMonitor) Run(ctx context.Context) error {
 
 // checkRisk performs a single risk check
 func (m *RiskMonitor) checkRisk(ctx context.Context) error {
-	// Get account state (mock for now)
-	accountState := m.getMockAccountState()
+	// Get account state
+	accountState, err := m.getAccountState(ctx)
+	if err != nil {
+		m.logger.Error("failed to get account state for risk check", zap.Error(err))
+		return err
+	}
 
 	// Calculate risk metrics
 	metrics := m.calculator.CalculateMetrics(accountState)
@@ -218,7 +241,27 @@ func (m *RiskMonitor) recordViolation(ctx context.Context, violation *limits.Pol
 	}
 }
 
-// getMockAccountState returns mock account state (replace with real data)
+// getAccountState retrieves account state from Account Monitor or falls back to mock data
+func (m *RiskMonitor) getAccountState(ctx context.Context) (risk.AccountState, error) {
+	if m.useMockData || m.accountProvider == nil {
+		m.logger.Warn("using mock account data in risk monitor - NOT SAFE FOR PRODUCTION")
+		return m.getMockAccountState(), nil
+	}
+
+	// Get real account state from Account Monitor
+	accountState, err := m.accountProvider.GetAccountState(ctx, m.accountID)
+	if err != nil {
+		m.logger.Error("failed to get account state from Account Monitor",
+			zap.String("account_id", m.accountID),
+			zap.Error(err),
+		)
+		return risk.AccountState{}, err
+	}
+
+	return accountState, nil
+}
+
+// getMockAccountState returns mock account state (ONLY for fallback/testing)
 func (m *RiskMonitor) getMockAccountState() risk.AccountState {
 	return risk.AccountState{
 		Equity:           100000.0,

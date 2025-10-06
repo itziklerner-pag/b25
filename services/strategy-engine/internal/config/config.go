@@ -29,16 +29,19 @@ type ServerConfig struct {
 	WriteTimeout   time.Duration `yaml:"writeTimeout"`
 	IdleTimeout    time.Duration `yaml:"idleTimeout"`
 	MaxHeaderBytes int           `yaml:"maxHeaderBytes"`
+	APIKey         string        `yaml:"apiKey"`         // Optional API key for authentication
+	EnableAuth     bool          `yaml:"enableAuth"`     // Enable API key authentication
 }
 
 // RedisConfig holds Redis configuration
 type RedisConfig struct {
-	Host         string `yaml:"host"`
-	Port         int    `yaml:"port"`
-	Password     string `yaml:"password"`
-	DB           int    `yaml:"db"`
-	PoolSize     int    `yaml:"poolSize"`
-	MinIdleConns int    `yaml:"minIdleConns"`
+	Host               string   `yaml:"host"`
+	Port               int      `yaml:"port"`
+	Password           string   `yaml:"password"`
+	DB                 int      `yaml:"db"`
+	PoolSize           int      `yaml:"poolSize"`
+	MinIdleConns       int      `yaml:"minIdleConns"`
+	MarketDataChannels []string `yaml:"marketDataChannels"`
 }
 
 // NATSConfig holds NATS configuration

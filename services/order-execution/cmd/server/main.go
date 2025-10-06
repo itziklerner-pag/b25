@@ -174,9 +174,20 @@ func loadConfig(path string) (*Config, error) {
 		return nil, err
 	}
 
+	// Expand environment variables in the YAML content
+	expandedData := os.ExpandEnv(string(data))
+
 	var cfg Config
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
+	if err := yaml.Unmarshal([]byte(expandedData), &cfg); err != nil {
 		return nil, err
+	}
+
+	// Override with environment variables if set
+	if apiKey := os.Getenv("BINANCE_API_KEY"); apiKey != "" {
+		cfg.Exchange.APIKey = apiKey
+	}
+	if secretKey := os.Getenv("BINANCE_SECRET_KEY"); secretKey != "" {
+		cfg.Exchange.SecretKey = secretKey
 	}
 
 	return &cfg, nil

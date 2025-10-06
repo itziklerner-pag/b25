@@ -84,7 +84,7 @@ func main() {
 	)
 
 	// Initialize handler
-	handler := api.NewHandler(configService, logger)
+	handler := api.NewHandler(configService, logger, db, natsConn)
 
 	// Setup router
 	router := api.SetupRouter(handler)

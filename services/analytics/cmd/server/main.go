@@ -76,7 +76,7 @@ func main() {
 	log.Info("Prometheus metrics initialized")
 
 	// Initialize event consumer
-	consumer := ingestion.NewConsumer(&cfg.Kafka, &cfg.Analytics.Ingestion, repo, log)
+	consumer := ingestion.NewConsumer(&cfg.Kafka, &cfg.Analytics.Ingestion, repo, prometheusMetrics, log)
 	if err := consumer.Start(); err != nil {
 		log.Fatal("Failed to start event consumer", zap.Error(err))
 	}
@@ -93,8 +93,8 @@ func main() {
 	log.Info("Aggregation engine started")
 
 	// Initialize API handler and router
-	handler := api.NewHandler(repo, redisCache, log)
-	router := api.SetupRouter(cfg, handler, log)
+	handler := api.NewHandler(repo, redisCache, prometheusMetrics, consumer, log)
+	router := api.SetupRouter(cfg, handler, log, redisCache.GetClient())
 
 	// HTTP server
 	httpServer := &http.Server{

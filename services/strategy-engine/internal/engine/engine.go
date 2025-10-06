@@ -233,7 +233,15 @@ func (e *Engine) loadStrategies() error {
 func (e *Engine) subscribeMarketData() {
 	defer e.wg.Done()
 
-	channels := []string{"market:btcusdt", "market:ethusdt"} // TODO: Make configurable
+	// Use configurable market data channels from config
+	channels := e.cfg.Redis.MarketDataChannels
+	if len(channels) == 0 {
+		// Fallback to default channels if not configured
+		channels = []string{"market:btcusdt", "market:ethusdt"}
+		e.logger.Warn("No market data channels configured, using defaults", "channels", channels)
+	}
+
+	e.logger.Info("Subscribing to market data channels", "channels", channels)
 
 	handler := func(data *strategies.MarketData) error {
 		return e.handleMarketData(data)
@@ -312,6 +320,10 @@ func (e *Engine) handleMarketData(data *strategies.MarketData) error {
 						"strategy", signal.Strategy,
 						"symbol", signal.Symbol,
 					)
+					e.metrics.SignalsDropped.WithLabelValues(
+						signal.Strategy,
+						signal.Symbol,
+					).Inc()
 				}
 			}
 		}(strategy)

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/b25/services/risk-manager/internal/cache"
+	"github.com/b25/services/risk-manager/internal/client"
 	"github.com/b25/services/risk-manager/internal/emergency"
 	"github.com/b25/services/risk-manager/internal/limits"
 	"github.com/b25/services/risk-manager/internal/risk"
@@ -14,15 +15,28 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// AccountStateProvider provides account state data
+type AccountStateProvider interface {
+	GetAccountState(ctx context.Context, accountID string) (risk.AccountState, error)
+}
+
+// MetricsCollector defines the interface for metrics collection
+type MetricsCollector interface {
+	RecordOrderCheck(approved bool, durationUs int64, rejectionReason string)
+}
+
 // RiskServer implements the gRPC RiskManager service
 type RiskServer struct {
 	pb.UnimplementedRiskManagerServer
-	logger         *zap.Logger
-	calculator     *risk.Calculator
-	policyEngine   *limits.PolicyEngine
-	policyCache    *cache.PolicyCache
-	priceCache     *cache.MarketPriceCache
-	stopManager    *emergency.StopManager
+	logger           *zap.Logger
+	calculator       *risk.Calculator
+	policyEngine     *limits.PolicyEngine
+	policyCache      *cache.PolicyCache
+	priceCache       *cache.MarketPriceCache
+	stopManager      *emergency.StopManager
+	accountProvider  AccountStateProvider
+	metrics          MetricsCollector
+	useMockData      bool
 }
 
 // NewRiskServer creates a new gRPC risk server
@@ -33,14 +47,25 @@ func NewRiskServer(
 	policyCache *cache.PolicyCache,
 	priceCache *cache.MarketPriceCache,
 	stopManager *emergency.StopManager,
+	accountProvider AccountStateProvider,
+	metrics MetricsCollector,
 ) *RiskServer {
+	useMock := false
+	if accountProvider == nil {
+		logger.Warn("Account Monitor client not provided, using mock data - NOT SAFE FOR PRODUCTION")
+		useMock = true
+	}
+
 	return &RiskServer{
-		logger:       logger,
-		calculator:   calculator,
-		policyEngine: policyEngine,
-		policyCache:  policyCache,
-		priceCache:   priceCache,
-		stopManager:  stopManager,
+		logger:          logger,
+		calculator:      calculator,
+		policyEngine:    policyEngine,
+		policyCache:     policyCache,
+		priceCache:      priceCache,
+		stopManager:     stopManager,
+		accountProvider: accountProvider,
+		metrics:         metrics,
+		useMockData:     useMock,
 	}
 }
 
@@ -73,8 +98,15 @@ func (s *RiskServer) CheckOrder(ctx context.Context, req *pb.OrderRiskRequest) (
 		currentPrice = price
 	}
 
-	// Create mock account state (in production, fetch from Account Monitor)
-	accountState := s.getMockAccountState(req.AccountId)
+	// Get account state (from Account Monitor or mock if unavailable)
+	accountState, err := s.getAccountState(ctx, req.AccountId)
+	if err != nil {
+		s.logger.Error("failed to get account state",
+			zap.String("account_id", req.AccountId),
+			zap.Error(err),
+		)
+		return nil, status.Errorf(codes.Unavailable, "account data unavailable: %v", err)
+	}
 
 	// Create order for simulation
 	order := risk.Order{
@@ -88,11 +120,11 @@ func (s *RiskServer) CheckOrder(ctx context.Context, req *pb.OrderRiskRequest) (
 	}
 
 	// Simulate order impact on account
-	postTradeState, err := s.calculator.SimulateOrder(accountState, order, currentPrice)
-	if err != nil {
+	postTradeState, simulateErr := s.calculator.SimulateOrder(accountState, order, currentPrice)
+	if simulateErr != nil {
 		return &pb.OrderRiskResponse{
 			Approved:          false,
-			Violations:        []string{err.Error()},
+			Violations:        []string{simulateErr.Error()},
 			RejectionReason:   "simulation_failed",
 			ProcessingTimeUs:  time.Since(startTime).Microseconds(),
 		}, nil
@@ -123,6 +155,15 @@ func (s *RiskServer) CheckOrder(ctx context.Context, req *pb.OrderRiskRequest) (
 
 	approved := len(blockingViolations) == 0
 	processingTime := time.Since(startTime).Microseconds()
+
+	// Record metrics
+	rejectionReason := ""
+	if !approved {
+		rejectionReason = "policy_violation"
+	}
+	if s.metrics != nil {
+		s.metrics.RecordOrderCheck(approved, processingTime, rejectionReason)
+	}
 
 	// Log the check
 	s.logger.Info("order risk check",
@@ -170,7 +211,14 @@ func (s *RiskServer) CheckOrderBatch(ctx context.Context, req *pb.BatchOrderRisk
 // GetRiskMetrics returns current risk metrics
 func (s *RiskServer) GetRiskMetrics(ctx context.Context, req *pb.RiskMetricsRequest) (*pb.RiskMetricsResponse, error) {
 	// Get account state
-	accountState := s.getMockAccountState(req.AccountId)
+	accountState, err := s.getAccountState(ctx, req.AccountId)
+	if err != nil {
+		s.logger.Error("failed to get account state for metrics",
+			zap.String("account_id", req.AccountId),
+			zap.Error(err),
+		)
+		return nil, status.Errorf(codes.Unavailable, "account data unavailable: %v", err)
+	}
 
 	// Calculate metrics
 	metrics := s.calculator.CalculateMetrics(accountState)
@@ -272,7 +320,32 @@ func (s *RiskServer) stopStatusToProto(status emergency.StopStatus) *pb.Emergenc
 	}
 }
 
-// getMockAccountState returns mock account state (replace with real Account Monitor client)
+// getAccountState retrieves account state from Account Monitor or falls back to mock data
+func (s *RiskServer) getAccountState(ctx context.Context, accountID string) (risk.AccountState, error) {
+	if s.useMockData || s.accountProvider == nil {
+		s.logger.Warn("using mock account data - NOT SAFE FOR PRODUCTION",
+			zap.String("account_id", accountID),
+		)
+		return s.getMockAccountState(accountID), nil
+	}
+
+	// Get real account state from Account Monitor
+	accountState, err := s.accountProvider.GetAccountState(ctx, accountID)
+	if err != nil {
+		s.logger.Error("failed to get account state from Account Monitor",
+			zap.String("account_id", accountID),
+			zap.Error(err),
+		)
+
+		// For now, return error instead of falling back to mock
+		// In production, you might want a circuit breaker pattern here
+		return risk.AccountState{}, err
+	}
+
+	return accountState, nil
+}
+
+// getMockAccountState returns mock account state (ONLY for fallback/testing)
 func (s *RiskServer) getMockAccountState(accountID string) risk.AccountState {
 	return risk.AccountState{
 		Equity:           100000.0,

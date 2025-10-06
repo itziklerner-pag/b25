@@ -11,10 +11,12 @@ import (
 	"time"
 
 	"github.com/b25/services/risk-manager/internal/cache"
+	"github.com/b25/services/risk-manager/internal/client"
 	"github.com/b25/services/risk-manager/internal/config"
 	"github.com/b25/services/risk-manager/internal/emergency"
 	"github.com/b25/services/risk-manager/internal/grpc"
 	"github.com/b25/services/risk-manager/internal/limits"
+	"github.com/b25/services/risk-manager/internal/middleware"
 	"github.com/b25/services/risk-manager/internal/monitor"
 	"github.com/b25/services/risk-manager/internal/repository"
 	"github.com/b25/services/risk-manager/internal/risk"
@@ -83,6 +85,28 @@ func main() {
 	defer nc.Close()
 	logger.Info("NATS connection established")
 
+	// Initialize Account Monitor client (with fallback to mock if unavailable)
+	var accountMonitorClient *client.AccountMonitorClient
+	if cfg.Risk.AccountMonitorURL != "" {
+		accountMonitorClient, err = client.NewAccountMonitorClient(
+			cfg.Risk.AccountMonitorURL,
+			"default_user", // TODO: Get from config or context
+			logger,
+		)
+		if err != nil {
+			logger.Warn("failed to connect to Account Monitor - will use mock data",
+				zap.String("url", cfg.Risk.AccountMonitorURL),
+				zap.Error(err),
+			)
+			accountMonitorClient = nil
+		} else {
+			defer accountMonitorClient.Close()
+			logger.Info("Account Monitor client connected")
+		}
+	} else {
+		logger.Warn("Account Monitor URL not configured - using mock data - NOT SAFE FOR PRODUCTION")
+	}
+
 	// Initialize components
 	policyRepo := repository.NewPolicyRepository(db)
 	policyCache := cache.NewPolicyCache(redisClient, cfg.Risk.PolicyCacheTTL)
@@ -117,7 +141,7 @@ func main() {
 	stopManager := emergency.NewStopManager(logger, alertPublisher)
 
 	// Initialize metrics collector
-	_ = monitor.NewMetricsCollector()
+	metricsCollector := monitor.NewMetricsCollector()
 
 	// Initialize gRPC server
 	riskServer := grpc.NewRiskServer(
@@ -127,6 +151,8 @@ func main() {
 		policyCache,
 		priceCache,
 		stopManager,
+		accountMonitorClient, // Pass Account Monitor client (or nil for mock)
+		metricsCollector,     // Pass metrics collector
 	)
 
 	// Start gRPC server
@@ -147,6 +173,8 @@ func main() {
 		stopManager,
 		alertPublisher,
 		cfg.Risk.MonitorInterval,
+		accountMonitorClient,  // Pass Account Monitor client (or nil for mock)
+		"default_user",        // TODO: Get from config
 	)
 
 	go func() {
@@ -245,6 +273,20 @@ func startGRPCServer(cfg *config.Config, logger *zap.Logger, riskServer *grpc.Ri
 		logger.Fatal("failed to listen", zap.Error(err))
 	}
 
+	// Create interceptors
+	authInterceptor := middleware.NewAuthInterceptor(logger, cfg.GRPC.APIKey, cfg.GRPC.AuthEnabled)
+	loggingInterceptor := middleware.NewLoggingInterceptor(logger)
+
+	// Log authentication status
+	if cfg.GRPC.AuthEnabled {
+		if cfg.GRPC.APIKey == "" {
+			logger.Fatal("gRPC authentication enabled but API key not configured")
+		}
+		logger.Info("gRPC authentication enabled")
+	} else {
+		logger.Warn("gRPC authentication disabled - NOT SAFE FOR PRODUCTION")
+	}
+
 	// Create gRPC server with options
 	grpcSrv := grpcServer.NewServer(
 		grpcServer.KeepaliveParams(keepalive.ServerParameters{
@@ -253,6 +295,14 @@ func startGRPCServer(cfg *config.Config, logger *zap.Logger, riskServer *grpc.Ri
 			Time:              cfg.GRPC.KeepAliveInterval,
 			Timeout:           cfg.GRPC.KeepAliveTimeout,
 		}),
+		grpcServer.ChainUnaryInterceptor(
+			loggingInterceptor.Unary(),
+			authInterceptor.Unary(),
+		),
+		grpcServer.ChainStreamInterceptor(
+			loggingInterceptor.Stream(),
+			authInterceptor.Stream(),
+		),
 	)
 
 	// Register services

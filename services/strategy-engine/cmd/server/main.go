@@ -88,7 +88,35 @@ func main() {
 func setCORSHeaders(w http.ResponseWriter) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-API-Key")
+}
+
+// authMiddleware checks API key if authentication is enabled
+func authMiddleware(cfg *config.Config, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Skip auth for OPTIONS requests
+		if r.Method == http.MethodOptions {
+			next(w, r)
+			return
+		}
+
+		// Skip auth if not enabled
+		if !cfg.Server.EnableAuth {
+			next(w, r)
+			return
+		}
+
+		// Check API key
+		apiKey := r.Header.Get("X-API-Key")
+		if apiKey == "" || apiKey != cfg.Server.APIKey {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte(`{"error":"unauthorized","message":"Invalid or missing API key"}`))
+			return
+		}
+
+		next(w, r)
+	}
 }
 
 func startHTTPServer(cfg *config.Config, log *logger.Logger, eng *engine.Engine) *http.Server {
@@ -131,8 +159,8 @@ func startHTTPServer(cfg *config.Config, log *logger.Logger, eng *engine.Engine)
 		mux.Handle(cfg.Metrics.Path, promhttp.Handler())
 	}
 
-	// Status endpoint
-	mux.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
+	// Status endpoint (protected if auth enabled)
+	mux.HandleFunc("/status", authMiddleware(cfg, func(w http.ResponseWriter, r *http.Request) {
 		// Set CORS headers
 		setCORSHeaders(w)
 
@@ -153,7 +181,7 @@ func startHTTPServer(cfg *config.Config, log *logger.Logger, eng *engine.Engine)
 			metrics["active_strategies"],
 			metrics["signal_queue_size"],
 		)
-	})
+	}))
 
 	srv := &http.Server{
 		Addr:           fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),

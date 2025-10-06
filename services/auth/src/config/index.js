@@ -27,9 +27,33 @@ export const databaseConfig = {
   connectionTimeoutMillis: getEnvNumber('DB_CONNECTION_TIMEOUT', 2000),
 };
 
+// Validate JWT secrets are not placeholders
+function validateJwtSecret(secret, name) {
+  if (!secret) {
+    throw new Error(`${name} is required but not set`);
+  }
+  if (secret.includes('change-this') || secret.includes('your-super-secret')) {
+    throw new Error(
+      `${name} contains placeholder value. Generate a strong secret using: openssl rand -base64 64`
+    );
+  }
+  if (secret.length < 32) {
+    throw new Error(`${name} must be at least 32 characters long for security`);
+  }
+}
+
+const accessSecret = getEnv('JWT_ACCESS_SECRET');
+const refreshSecret = getEnv('JWT_REFRESH_SECRET');
+
+// Validate secrets in production
+if (process.env.NODE_ENV === 'production') {
+  validateJwtSecret(accessSecret, 'JWT_ACCESS_SECRET');
+  validateJwtSecret(refreshSecret, 'JWT_REFRESH_SECRET');
+}
+
 export const jwtConfig = {
-  accessTokenSecret: getEnv('JWT_ACCESS_SECRET'),
-  refreshTokenSecret: getEnv('JWT_REFRESH_SECRET'),
+  accessTokenSecret: accessSecret,
+  refreshTokenSecret: refreshSecret,
   accessTokenExpiry: getEnv('JWT_ACCESS_EXPIRY', '15m'),
   refreshTokenExpiry: getEnv('JWT_REFRESH_EXPIRY', '7d'),
 };

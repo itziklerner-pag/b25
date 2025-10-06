@@ -1,15 +1,18 @@
 package api
 
 import (
+	"context"
+	"fmt"
 	"time"
 
 	"github.com/b25/analytics/internal/config"
 	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis/v8"
 	"go.uber.org/zap"
 )
 
 // SetupRouter creates and configures the HTTP router
-func SetupRouter(cfg *config.Config, handler *Handler, logger *zap.Logger) *gin.Engine {
+func SetupRouter(cfg *config.Config, handler *Handler, logger *zap.Logger, redisClient *redis.Client) *gin.Engine {
 	// Set Gin mode
 	if cfg.Logging.Level == "debug" {
 		gin.SetMode(gin.DebugMode)
@@ -20,6 +23,7 @@ func SetupRouter(cfg *config.Config, handler *Handler, logger *zap.Logger) *gin.
 	router := gin.New()
 
 	// Middleware
+	router.Use(RequestIDMiddleware())
 	router.Use(LoggerMiddleware(logger))
 	router.Use(gin.Recovery())
 
@@ -28,7 +32,7 @@ func SetupRouter(cfg *config.Config, handler *Handler, logger *zap.Logger) *gin.
 	}
 
 	if cfg.Security.RateLimit.Enabled {
-		router.Use(RateLimitMiddleware(cfg.Security.RateLimit))
+		router.Use(RateLimitMiddleware(redisClient, cfg.Security.RateLimit, logger))
 	}
 
 	// API v1 routes
@@ -59,18 +63,34 @@ func SetupRouter(cfg *config.Config, handler *Handler, logger *zap.Logger) *gin.
 	return router
 }
 
+// RequestIDMiddleware generates and adds request ID to context
+func RequestIDMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		requestID := c.GetHeader("X-Request-ID")
+		if requestID == "" {
+			// Generate a simple request ID (timestamp + random component)
+			requestID = fmt.Sprintf("%d-%d", time.Now().UnixNano(), time.Now().Unix()%1000000)
+		}
+		c.Set("request_id", requestID)
+		c.Header("X-Request-ID", requestID)
+		c.Next()
+	}
+}
+
 // LoggerMiddleware logs HTTP requests
 func LoggerMiddleware(logger *zap.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		path := c.Request.URL.Path
 		query := c.Request.URL.RawQuery
+		requestID, _ := c.Get("request_id")
 
 		c.Next()
 
 		latency := time.Since(start)
 
 		logger.Info("HTTP request",
+			zap.String("request_id", fmt.Sprintf("%v", requestID)),
 			zap.String("method", c.Request.Method),
 			zap.String("path", path),
 			zap.String("query", query),
@@ -112,12 +132,48 @@ func CORSMiddleware(cfg config.CORSConfig) gin.HandlerFunc {
 	}
 }
 
-// RateLimitMiddleware implements basic rate limiting
-func RateLimitMiddleware(cfg config.RateLimitConfig) gin.HandlerFunc {
-	// Simple in-memory rate limiter
-	// In production, use Redis-based rate limiting
+// RateLimitMiddleware implements Redis-based rate limiting
+func RateLimitMiddleware(redisClient *redis.Client, cfg config.RateLimitConfig, logger *zap.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// TODO: Implement proper rate limiting with Redis
+		ctx := context.Background()
+
+		// Use client IP as rate limit key
+		key := fmt.Sprintf("ratelimit:%s", c.ClientIP())
+
+		// Increment counter
+		pipe := redisClient.Pipeline()
+		incr := pipe.Incr(ctx, key)
+		pipe.Expire(ctx, key, time.Minute)
+		_, err := pipe.Exec(ctx)
+
+		if err != nil {
+			logger.Warn("Rate limit check failed", zap.Error(err))
+			// On error, allow the request (fail open)
+			c.Next()
+			return
+		}
+
+		count := incr.Val()
+
+		// Check if limit exceeded
+		if count > int64(cfg.RequestsPerMinute) {
+			logger.Warn("Rate limit exceeded",
+				zap.String("client_ip", c.ClientIP()),
+				zap.Int64("requests", count),
+				zap.Int("limit", cfg.RequestsPerMinute),
+			)
+			c.JSON(429, gin.H{
+				"error": "rate limit exceeded",
+				"retry_after": 60,
+			})
+			c.Abort()
+			return
+		}
+
+		// Add rate limit headers
+		c.Header("X-RateLimit-Limit", fmt.Sprintf("%d", cfg.RequestsPerMinute))
+		c.Header("X-RateLimit-Remaining", fmt.Sprintf("%d", cfg.RequestsPerMinute-int(count)))
+
 		c.Next()
 	}
 }

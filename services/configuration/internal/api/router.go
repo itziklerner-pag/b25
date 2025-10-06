@@ -21,8 +21,9 @@ func SetupRouter(handler *Handler) *gin.Engine {
 	// Metrics endpoint
 	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
-	// API v1 routes
+	// API v1 routes - protected with API key authentication
 	v1 := router.Group("/api/v1")
+	v1.Use(APIKeyMiddleware())
 	{
 		// Configuration routes
 		configs := v1.Group("/configurations")

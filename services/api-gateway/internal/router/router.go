@@ -35,6 +35,7 @@ func New(cfg *config.Config, log *logger.Logger, m *metrics.Collector) (*Router,
 
 	breakerMgr := breaker.NewManager(cfg.CircuitBreaker, log, m)
 	proxyService := services.NewProxyService(cfg, log, m, breakerMgr, cache)
+	wsProxy := services.NewWebSocketProxy(cfg, log)
 
 	// Initialize middleware
 	loggingMw := middleware.NewLoggingMiddleware(log, m)
@@ -42,6 +43,7 @@ func New(cfg *config.Config, log *logger.Logger, m *metrics.Collector) (*Router,
 	rateLimitMw := middleware.NewRateLimitMiddleware(cfg.RateLimit, log, m)
 	corsMw := middleware.NewCORSMiddleware(cfg.CORS)
 	validationMw := middleware.NewValidationMiddleware(cfg.Validation, log)
+	securityMw := middleware.NewSecurityMiddleware(cfg.TLS.Enabled)
 
 	// Initialize handlers
 	healthHandler := handlers.NewHealthHandler(cfg, log, breakerMgr)
@@ -51,6 +53,7 @@ func New(cfg *config.Config, log *logger.Logger, m *metrics.Collector) (*Router,
 	// Global middleware
 	engine.Use(loggingMw.Recovery())
 	engine.Use(loggingMw.RequestID())
+	engine.Use(securityMw.SecurityHeaders())
 	engine.Use(corsMw.Handle())
 	engine.Use(loggingMw.ConnectionCounter())
 
@@ -238,12 +241,19 @@ func New(cfg *config.Config, log *logger.Logger, m *metrics.Collector) (*Router,
 
 	// WebSocket routes (if enabled)
 	if cfg.WebSocket.Enabled {
-		// WebSocket connections are typically handled differently
-		// This is a placeholder for WebSocket upgrade handling
-		engine.GET("/ws", func(c *gin.Context) {
-			// In production, implement WebSocket upgrade and proxy logic
-			c.JSON(200, gin.H{"message": "WebSocket endpoint"})
-		})
+		// WebSocket endpoint for dashboard server
+		// This proxies WebSocket connections to the dashboard-server backend
+		wsRoutes := engine.Group("/ws")
+		if cfg.Auth.Enabled {
+			wsRoutes.Use(authMw.Authenticate())
+		}
+		{
+			// Main WebSocket endpoint - proxies to dashboard server
+			wsRoutes.GET("", wsProxy.HandleWebSocket("dashboard_server"))
+
+			// Additional WebSocket endpoints can be added here
+			// wsRoutes.GET("/market-data", wsProxy.HandleWebSocket("market_data"))
+		}
 	}
 
 	return &Router{

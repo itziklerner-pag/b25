@@ -51,3 +51,9 @@ temp/
 
 # Build artifacts
 strategy-engine
+
+# Generated protobuf code
+proto/*.pb.go
+
+# Deployment
+*.pid

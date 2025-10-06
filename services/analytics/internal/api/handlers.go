@@ -1,12 +1,13 @@
 package api
 
 import (
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/b25/analytics/internal/cache"
+	"github.com/b25/analytics/internal/ingestion"
+	"github.com/b25/analytics/internal/metrics"
 	"github.com/b25/analytics/internal/models"
 	"github.com/b25/analytics/internal/repository"
 	"github.com/gin-gonic/gin"
@@ -16,17 +17,21 @@ import (
 
 // Handler handles HTTP requests
 type Handler struct {
-	repo   *repository.Repository
-	cache  *cache.RedisCache
-	logger *zap.Logger
+	repo              *repository.Repository
+	cache             *cache.RedisCache
+	prometheusMetrics *metrics.Metrics
+	consumer          *ingestion.Consumer
+	logger            *zap.Logger
 }
 
 // NewHandler creates a new API handler
-func NewHandler(repo *repository.Repository, cache *cache.RedisCache, logger *zap.Logger) *Handler {
+func NewHandler(repo *repository.Repository, cache *cache.RedisCache, promMetrics *metrics.Metrics, consumer *ingestion.Consumer, logger *zap.Logger) *Handler {
 	return &Handler{
-		repo:   repo,
-		cache:  cache,
-		logger: logger,
+		repo:              repo,
+		cache:             cache,
+		prometheusMetrics: promMetrics,
+		consumer:          consumer,
+		logger:            logger,
 	}
 }
 
@@ -120,6 +125,7 @@ func (h *Handler) GetEvents(c *gin.Context) {
 
 // GetMetrics retrieves aggregated metrics
 func (h *Handler) GetMetrics(c *gin.Context) {
+	start := time.Now()
 	metricName := c.Query("metric_name")
 	interval := c.DefaultQuery("interval", "1h")
 	startTimeStr := c.Query("start_time")
@@ -165,12 +171,16 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 	if err != nil {
 		h.logger.Warn("Failed to get from cache", zap.Error(err))
 	} else if cachedResult != nil {
+		h.prometheusMetrics.CacheHits.Inc()
+		h.prometheusMetrics.QueryDuration.Observe(time.Since(start).Seconds())
 		c.JSON(http.StatusOK, gin.H{
 			"cached": true,
 			"result": cachedResult,
 		})
 		return
 	}
+
+	h.prometheusMetrics.CacheMisses.Inc()
 
 	// Query database
 	aggregations, err := h.repo.GetMetricAggregations(c.Request.Context(), metricName, interval, startTime, endTime)
@@ -209,6 +219,8 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 	if err := h.cache.SetQueryResult(c.Request.Context(), cacheKey, result); err != nil {
 		h.logger.Warn("Failed to cache result", zap.Error(err))
 	}
+
+	h.prometheusMetrics.QueryDuration.Observe(time.Since(start).Seconds())
 
 	c.JSON(http.StatusOK, gin.H{
 		"cached": false,
@@ -358,12 +370,15 @@ func (h *Handler) HealthCheck(c *gin.Context) {
 	c.JSON(statusCode, health)
 }
 
-// GetIngestionMetrics returns ingestion metrics (would be wired to the consumer)
+// GetIngestionMetrics returns ingestion metrics
 func (h *Handler) GetIngestionMetrics(c *gin.Context) {
-	// This would be connected to the actual consumer metrics
+	metrics := h.consumer.GetMetrics()
 	c.JSON(http.StatusOK, gin.H{
-		"events_ingested": 0,
-		"events_failed":   0,
-		"batches_processed": 0,
+		"events_ingested":     metrics.EventsIngested,
+		"events_failed":       metrics.EventsFailed,
+		"batches_processed":   metrics.BatchesProcessed,
+		"last_batch_size":     metrics.LastBatchSize,
+		"last_batch_duration": metrics.LastBatchDuration.String(),
+		"total_latency":       metrics.TotalLatency.String(),
 	})
 }

@@ -1,10 +1,6 @@
-<<<<<<< HEAD
-# Build stage
-=======
 # Multi-stage build for Go Strategy Engine Service
 
 # Builder stage - compiles the application and plugins
->>>>>>> refs/remotes/origin/main
 FROM golang:1.21-alpine AS builder
 
 # Install build dependencies
@@ -34,13 +30,6 @@ RUN if [ -d "plugins/go" ] && [ -n "$(ls -A plugins/go/*.go 2>/dev/null)" ]; the
     done; \
 fi
 
-<<<<<<< HEAD
-# Runtime stage
-FROM alpine:3.18
-
-# Install runtime dependencies
-RUN apk add --no-cache ca-certificates tzdata python3 py3-pip
-=======
 # Development stage - includes dev tools and supports hot reload
 FROM golang:1.21-alpine AS development
 
@@ -72,7 +61,6 @@ FROM alpine:3.18
 
 # Install runtime dependencies
 RUN apk add --no-cache ca-certificates tzdata python3 py3-pip wget
->>>>>>> refs/remotes/origin/main
 
 WORKDIR /app
 
@@ -100,11 +88,7 @@ USER strategy
 # Expose ports
 EXPOSE 9092
 
-<<<<<<< HEAD
-# Health check
-=======
 # Health check for production
->>>>>>> refs/remotes/origin/main
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:9092/health || exit 1
 

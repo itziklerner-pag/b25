@@ -5,7 +5,9 @@ import rateLimit from 'express-rate-limit';
 import { serverConfig } from './config/index.js';
 import authRoutes from './routes/auth.routes.js';
 import healthRoutes from './routes/health.routes.js';
+import metricsRoutes from './routes/metrics.routes.js';
 import { errorHandler, notFoundHandler } from './middleware/error-handler.js';
+import metricsMiddleware from './middleware/metrics.js';
 import logger from './utils/logger.js';
 
 export function createApp() {
@@ -27,6 +29,9 @@ export function createApp() {
   // Body parsing middleware
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+  // Metrics middleware
+  app.use(metricsMiddleware);
 
   // Rate limiting
   const limiter = rateLimit({
@@ -58,6 +63,7 @@ export function createApp() {
 
   // Routes
   app.use('/health', healthRoutes);
+  app.use('/metrics', metricsRoutes);
   app.use('/auth', authRoutes);
 
   // 404 handler

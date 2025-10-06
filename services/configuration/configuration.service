@@ -1,0 +1,39 @@
+[Unit]
+Description=Configuration Service - Centralized configuration management
+Documentation=https://github.com/b25/services/configuration
+After=network.target docker.service
+Requires=docker.service
+PartOf=b25.target
+
+[Service]
+Type=simple
+User=mm
+Group=mm
+WorkingDirectory=/home/mm/dev/b25/services/configuration
+ExecStart=/home/mm/dev/b25/services/configuration/bin/configuration-service
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=configuration
+
+# Environment
+Environment="GIN_MODE=release"
+# Environment="CONFIG_API_KEY=your-secret-key-here"
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/home/mm/dev/b25/services/configuration
+ReadOnlyPaths=/etc
+
+# Resource limits
+LimitNOFILE=65536
+MemoryLimit=512M
+CPUQuota=200%
+
+[Install]
+WantedBy=multi-user.target
+WantedBy=b25.target

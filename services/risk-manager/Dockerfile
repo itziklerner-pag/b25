@@ -1,10 +1,6 @@
-<<<<<<< HEAD
-# Build stage
-=======
 # Multi-stage build for Go Risk Manager Service
 
 # Builder stage - compiles the application
->>>>>>> refs/remotes/origin/main
 FROM golang:1.22-alpine AS builder
 
 WORKDIR /app
@@ -22,9 +18,6 @@ COPY . .
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o /app/risk-manager ./cmd/server
 
-<<<<<<< HEAD
-# Runtime stage
-=======
 # Development stage - includes dev tools and supports hot reload
 FROM golang:1.22-alpine AS development
 
@@ -41,28 +34,23 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 # Expose ports
-EXPOSE 50051 9095
+EXPOSE 50052 8083
 
 # Health check for development
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:9095/health || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8083/health || exit 1
 
 # Note: Source code and migrations should be mounted as volume in docker-compose
 # Development command with hot reload
 CMD ["air", "-c", ".air.toml"]
 
 # Production stage - minimal runtime image
->>>>>>> refs/remotes/origin/main
 FROM alpine:3.19
 
 WORKDIR /app
 
 # Install ca-certificates for HTTPS
-<<<<<<< HEAD
-RUN apk --no-cache add ca-certificates tzdata
-=======
 RUN apk --no-cache add ca-certificates tzdata wget
->>>>>>> refs/remotes/origin/main
 
 # Create non-root user
 RUN addgroup -g 1000 riskmanager && \
@@ -81,15 +69,11 @@ RUN chown -R riskmanager:riskmanager /app
 USER riskmanager
 
 # Expose ports
-EXPOSE 50051 9095
+EXPOSE 50052 8083
 
-<<<<<<< HEAD
-# Health check
-=======
 # Health check for production
->>>>>>> refs/remotes/origin/main
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:9095/health || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8083/health || exit 1
 
 # Run the application
 ENTRYPOINT ["/app/risk-manager"]

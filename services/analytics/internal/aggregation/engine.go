@@ -173,17 +173,82 @@ func (e *Engine) aggregateEventCounts(ctx context.Context, interval Interval, ti
 
 // aggregateTradingMetrics aggregates trading-specific metrics
 func (e *Engine) aggregateTradingMetrics(ctx context.Context, interval Interval, timeBucket time.Time) error {
-	// This would include:
-	// - Order fill rates
-	// - Average latency
-	// - Volume metrics
-	// - P&L aggregations
-	// - Strategy performance
+	startTime := timeBucket
+	endTime := timeBucket.Add(interval.Duration)
 
-	// Placeholder for now - would be implemented with actual trading queries
-	e.logger.Debug("Trading metrics aggregation placeholder",
+	// Calculate order fill rate
+	orderPlaced, err := e.repo.GetEventCountByTypeInRange(ctx, "order.placed", startTime, endTime)
+	if err != nil {
+		return fmt.Errorf("failed to get order.placed count: %w", err)
+	}
+
+	orderFilled, err := e.repo.GetEventCountByTypeInRange(ctx, "order.filled", startTime, endTime)
+	if err != nil {
+		return fmt.Errorf("failed to get order.filled count: %w", err)
+	}
+
+	orderCanceled, err := e.repo.GetEventCountByTypeInRange(ctx, "order.canceled", startTime, endTime)
+	if err != nil {
+		return fmt.Errorf("failed to get order.canceled count: %w", err)
+	}
+
+	// Calculate fill rate percentage
+	var fillRate float64
+	if orderPlaced > 0 {
+		fillRate = float64(orderFilled) / float64(orderPlaced) * 100
+	}
+
+	// Store fill rate metric
+	fillRateMetric := &models.MetricAggregation{
+		ID:         uuid.New(),
+		MetricName: "trading.order_fill_rate",
+		Interval:   interval.Name,
+		TimeBucket: timeBucket,
+		Count:      orderPlaced,
+		Avg:        &fillRate,
+		Dimensions: map[string]interface{}{
+			"orders_placed":   orderPlaced,
+			"orders_filled":   orderFilled,
+			"orders_canceled": orderCanceled,
+		},
+		CreatedAt: time.Now(),
+	}
+
+	if err := e.repo.InsertMetricAggregation(ctx, fillRateMetric); err != nil {
+		e.logger.Error("Failed to insert fill rate metric", zap.Error(err))
+	}
+
+	// Calculate total volume from filled orders
+	totalVolume, err := e.repo.GetTotalVolumeInRange(ctx, startTime, endTime)
+	if err != nil {
+		e.logger.Warn("Failed to get total volume", zap.Error(err))
+		totalVolume = 0
+	}
+
+	volumeMetric := &models.MetricAggregation{
+		ID:         uuid.New(),
+		MetricName: "trading.total_volume",
+		Interval:   interval.Name,
+		TimeBucket: timeBucket,
+		Count:      orderFilled,
+		Sum:        &totalVolume,
+		Dimensions: map[string]interface{}{
+			"volume": totalVolume,
+		},
+		CreatedAt: time.Now(),
+	}
+
+	if err := e.repo.InsertMetricAggregation(ctx, volumeMetric); err != nil {
+		e.logger.Error("Failed to insert volume metric", zap.Error(err))
+	}
+
+	e.logger.Debug("Trading metrics aggregated",
 		zap.String("interval", interval.Name),
 		zap.Time("time_bucket", timeBucket),
+		zap.Int64("orders_placed", orderPlaced),
+		zap.Int64("orders_filled", orderFilled),
+		zap.Float64("fill_rate", fillRate),
+		zap.Float64("total_volume", totalVolume),
 	)
 
 	return nil

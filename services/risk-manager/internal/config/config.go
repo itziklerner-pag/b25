@@ -62,6 +62,8 @@ type GRPCConfig struct {
 	MaxConnectionAge    time.Duration
 	KeepAliveInterval   time.Duration
 	KeepAliveTimeout    time.Duration
+	AuthEnabled         bool
+	APIKey              string
 }
 
 type RiskConfig struct {
@@ -164,6 +166,8 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("grpc.maxConnectionAge", 30*time.Minute)
 	v.SetDefault("grpc.keepAliveInterval", 30*time.Second)
 	v.SetDefault("grpc.keepAliveTimeout", 10*time.Second)
+	v.SetDefault("grpc.authEnabled", false)
+	v.SetDefault("grpc.apiKey", "")
 
 	// Risk
 	v.SetDefault("risk.monitorInterval", 1*time.Second)

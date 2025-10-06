@@ -55,6 +55,11 @@ func (c *RedisCache) Close() error {
 	return c.client.Close()
 }
 
+// GetClient returns the underlying Redis client for advanced operations
+func (c *RedisCache) GetClient() *redis.Client {
+	return c.client
+}
+
 // GetDashboardMetrics retrieves cached dashboard metrics
 func (c *RedisCache) GetDashboardMetrics(ctx context.Context) (*models.DashboardMetrics, error) {
 	key := "dashboard:metrics"
