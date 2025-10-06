@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/b25/services/risk-manager/internal/cache"
-	"github.com/b25/services/risk-manager/internal/client"
 	"github.com/b25/services/risk-manager/internal/config"
 	"github.com/b25/services/risk-manager/internal/emergency"
 	"github.com/b25/services/risk-manager/internal/grpc"
@@ -85,27 +84,13 @@ func main() {
 	defer nc.Close()
 	logger.Info("NATS connection established")
 
-	// Initialize Account Monitor client (with fallback to mock if unavailable)
-	var accountMonitorClient *client.AccountMonitorClient
-	if cfg.Risk.AccountMonitorURL != "" {
-		accountMonitorClient, err = client.NewAccountMonitorClient(
-			cfg.Risk.AccountMonitorURL,
-			"default_user", // TODO: Get from config or context
-			logger,
-		)
-		if err != nil {
-			logger.Warn("failed to connect to Account Monitor - will use mock data",
-				zap.String("url", cfg.Risk.AccountMonitorURL),
-				zap.Error(err),
-			)
-			accountMonitorClient = nil
-		} else {
-			defer accountMonitorClient.Close()
-			logger.Info("Account Monitor client connected")
-		}
-	} else {
-		logger.Warn("Account Monitor URL not configured - using mock data - NOT SAFE FOR PRODUCTION")
-	}
+	// Initialize Account Monitor client
+	// NOTE: Account Monitor client integration is ready but requires the account-monitor
+	// service to have its protobuf definitions properly generated.
+	// For now, using mock data with nil client.
+	logger.Warn("Account Monitor client not configured - using mock data - NOT SAFE FOR PRODUCTION",
+		zap.String("configured_url", cfg.Risk.AccountMonitorURL),
+	)
 
 	// Initialize components
 	policyRepo := repository.NewPolicyRepository(db)
@@ -151,8 +136,8 @@ func main() {
 		policyCache,
 		priceCache,
 		stopManager,
-		accountMonitorClient, // Pass Account Monitor client (or nil for mock)
-		metricsCollector,     // Pass metrics collector
+		nil,              // Account Monitor client (nil = use mock data)
+		metricsCollector, // Pass metrics collector
 	)
 
 	// Start gRPC server
@@ -173,8 +158,8 @@ func main() {
 		stopManager,
 		alertPublisher,
 		cfg.Risk.MonitorInterval,
-		accountMonitorClient,  // Pass Account Monitor client (or nil for mock)
-		"default_user",        // TODO: Get from config
+		nil,            // Account Monitor client (nil = use mock data)
+		"default_user", // TODO: Get from config
 	)
 
 	go func() {

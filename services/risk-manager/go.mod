@@ -10,7 +10,6 @@ require (
 	github.com/prometheus/client_golang v1.18.0
 	github.com/redis/go-redis/v9 v9.4.0
 	github.com/spf13/viper v1.18.2
-	github.com/yourorg/b25/services/account-monitor v0.0.0
 	go.uber.org/zap v1.26.0
 	google.golang.org/grpc v1.60.1
 	google.golang.org/protobuf v1.32.0
@@ -51,5 +50,3 @@ require (
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/yourorg/b25/services/account-monitor => ../account-monitor

@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/b25/services/risk-manager/internal/cache"
-	"github.com/b25/services/risk-manager/internal/client"
 	"github.com/b25/services/risk-manager/internal/emergency"
 	"github.com/b25/services/risk-manager/internal/limits"
 	"github.com/b25/services/risk-manager/internal/risk"
