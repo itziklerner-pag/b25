@@ -1,0 +1,30 @@
+[Unit]
+Description=Account Monitor Service
+Documentation=https://github.com/yourusername/b25/services/account-monitor
+After=network.target postgresql.service redis.service nats.service
+Wants=postgresql.service redis.service nats.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/account-monitor
+EnvironmentFile=/opt/account-monitor/.env
+ExecStart=/opt/account-monitor/account-monitor
+Restart=always
+RestartSec=10s
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=account-monitor
+
+[Install]
+WantedBy=multi-user.target
