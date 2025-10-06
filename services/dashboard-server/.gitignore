@@ -36,3 +36,9 @@ Thumbs.db
 
 # Dependencies
 vendor/
+
+# Deployment
+deployment-info.txt
+config.yaml
+logs/
+node_modules/

@@ -18,13 +18,9 @@ import (
 	"github.com/yourusername/b25/services/dashboard-server/internal/types"
 )
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 4096,
-	CheckOrigin: func(r *http.Request) bool {
-		// TODO: Implement proper origin checking in production
-		return true
-	},
+type Config struct {
+	AllowedOrigins []string
+	APIKey         string // Optional API key for authentication
 }
 
 type Server struct {
@@ -35,6 +31,8 @@ type Server struct {
 	logger         zerolog.Logger
 	shutdownCtx    context.Context
 	shutdownCancel context.CancelFunc
+	config         Config
+	upgrader       websocket.Upgrader
 }
 
 type Client struct {
@@ -50,20 +48,78 @@ type Client struct {
 	Format        types.SerializationFormat
 }
 
-func NewServer(logger zerolog.Logger, aggregator *aggregator.Aggregator, broadcaster *broadcaster.Broadcaster) *Server {
+func NewServer(logger zerolog.Logger, aggregator *aggregator.Aggregator, broadcaster *broadcaster.Broadcaster, config Config) *Server {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &Server{
+
+	s := &Server{
 		clients:        make(map[string]*Client),
 		aggregator:     aggregator,
 		broadcaster:    broadcaster,
 		logger:         logger,
 		shutdownCtx:    ctx,
 		shutdownCancel: cancel,
+		config:         config,
 	}
+
+	// Create upgrader with proper origin checking
+	s.upgrader = websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 4096,
+		CheckOrigin:     s.checkOrigin,
+	}
+
+	return s
+}
+
+// checkOrigin validates the Origin header against allowed origins
+func (s *Server) checkOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+
+	// If no origin (e.g., direct WebSocket connection), allow
+	if origin == "" {
+		return true
+	}
+
+	// If no allowed origins configured, allow all (backwards compatibility)
+	if len(s.config.AllowedOrigins) == 0 {
+		s.logger.Warn().Msg("No allowed origins configured - allowing all origins (insecure)")
+		return true
+	}
+
+	// Check if origin is in allowed list
+	for _, allowed := range s.config.AllowedOrigins {
+		if origin == allowed {
+			return true
+		}
+	}
+
+	s.logger.Warn().
+		Str("origin", origin).
+		Strs("allowed_origins", s.config.AllowedOrigins).
+		Msg("WebSocket connection rejected - origin not allowed")
+
+	return false
 }
 
 func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
-	conn, err := upgrader.Upgrade(w, r, nil)
+	// Check API key if configured
+	if s.config.APIKey != "" {
+		providedKey := r.Header.Get("X-API-Key")
+		if providedKey == "" {
+			// Also check query parameter for easier testing
+			providedKey = r.URL.Query().Get("api_key")
+		}
+
+		if providedKey != s.config.APIKey {
+			s.logger.Warn().
+				Str("remote_addr", r.RemoteAddr).
+				Msg("WebSocket connection rejected - invalid or missing API key")
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+	}
+
+	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		s.logger.Error().Err(err).Msg("Failed to upgrade WebSocket connection")
 		return

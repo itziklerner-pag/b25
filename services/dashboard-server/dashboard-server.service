@@ -1,0 +1,45 @@
+[Unit]
+Description=Dashboard Server - WebSocket state aggregation and broadcasting
+Documentation=https://github.com/your-org/b25
+After=network.target docker.service redis.service market-data.service
+Requires=docker.service
+Wants=redis.service market-data.service
+
+[Service]
+Type=simple
+User=mm
+Group=mm
+WorkingDirectory=/home/mm/dev/b25/services/dashboard-server
+
+# Main service
+ExecStart=/home/mm/dev/b25/services/dashboard-server/dashboard-server
+
+# Restart policy
+Restart=on-failure
+RestartSec=5s
+StartLimitIntervalSec=120s
+StartLimitBurst=5
+
+# Resource limits
+CPUQuota=50%
+MemoryLimit=512M
+MemoryHigh=256M
+TasksMax=100
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=dashboard-server
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/tmp /home/mm/dev/b25/services/dashboard-server/logs
+
+# Environment
+Environment="DASHBOARD_LOG_LEVEL=info"
+
+[Install]
+WantedBy=multi-user.target

@@ -62,7 +62,11 @@ func main() {
 	defer broadcaster.Stop()
 
 	// Create WebSocket server
-	wsServer := server.NewServer(logger, stateAggregator, broadcaster)
+	serverConfig := server.Config{
+		AllowedOrigins: config.AllowedOrigins,
+		APIKey:         config.APIKey,
+	}
+	wsServer := server.NewServer(logger, stateAggregator, broadcaster, serverConfig)
 
 	// Setup HTTP routes
 	mux := http.NewServeMux()
@@ -119,26 +123,45 @@ type Config struct {
 	OrderServiceGRPC    string
 	StrategyServiceHTTP string
 	AccountServiceGRPC  string
+	AllowedOrigins      []string
+	APIKey              string // Optional API key for authentication
 }
 
 func loadConfig() (*Config, error) {
-	viper.SetDefault("port", 8086)
-	viper.SetDefault("log_level", "info")
-	viper.SetDefault("redis_url", "localhost:6379")
-	viper.SetDefault("order_service_grpc", "localhost:50051")
-	viper.SetDefault("strategy_service_http", "http://localhost:8082")
-	viper.SetDefault("account_service_grpc", "localhost:50055")
+	// Try to load from config file
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(".")
+	viper.AddConfigPath("/etc/dashboard-server/")
+
+	// Set defaults
+	viper.SetDefault("server.port", 8086)
+	viper.SetDefault("server.log_level", "info")
+	viper.SetDefault("redis.url", "localhost:6379")
+	viper.SetDefault("backend_services.order_execution.url", "localhost:50051")
+	viper.SetDefault("backend_services.strategy_engine.url", "http://localhost:8082")
+	viper.SetDefault("backend_services.account_monitor.url", "localhost:50055")
+	viper.SetDefault("websocket.allowed_origins", []string{
+		"http://localhost:5173",
+		"http://localhost:3000",
+		"http://localhost:8080",
+	})
+
+	// Read config file (ignore error if doesn't exist)
+	_ = viper.ReadInConfig()
 
 	viper.SetEnvPrefix("DASHBOARD")
 	viper.AutomaticEnv()
 
 	return &Config{
-		Port:                viper.GetInt("port"),
-		LogLevel:            viper.GetString("log_level"),
-		RedisURL:            viper.GetString("redis_url"),
-		OrderServiceGRPC:    viper.GetString("order_service_grpc"),
-		StrategyServiceHTTP: viper.GetString("strategy_service_http"),
-		AccountServiceGRPC:  viper.GetString("account_service_grpc"),
+		Port:                viper.GetInt("server.port"),
+		LogLevel:            viper.GetString("server.log_level"),
+		RedisURL:            viper.GetString("redis.url"),
+		OrderServiceGRPC:    viper.GetString("backend_services.order_execution.url"),
+		StrategyServiceHTTP: viper.GetString("backend_services.strategy_engine.url"),
+		AccountServiceGRPC:  viper.GetString("backend_services.account_monitor.url"),
+		AllowedOrigins:      viper.GetStringSlice("websocket.allowed_origins"),
+		APIKey:              viper.GetString("security.api_key"),
 	}, nil
 }
 
