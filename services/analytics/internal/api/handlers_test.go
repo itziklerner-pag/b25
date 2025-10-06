@@ -10,7 +10,6 @@ import (
 
 	"github.com/b25/analytics/internal/models"
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )
