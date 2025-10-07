@@ -15,6 +15,8 @@ websocket:
   read_timeout: 60s
   write_timeout: 10s
   allowed_origins:
+    - https://mm.itziklerner.com
+    - http://mm.itziklerner.com
     - http://localhost:5173
     - http://localhost:3000
     - http://localhost:8080

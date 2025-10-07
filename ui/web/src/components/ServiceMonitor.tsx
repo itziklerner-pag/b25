@@ -22,16 +22,19 @@ import {
   Search,
   RefreshCw,
   ChevronRight,
+  MinusCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { logger } from '@/utils/logger';
+import { config } from '@/config/env';
 
 export interface ServiceMetrics {
   name: string;
   type: 'trading' | 'infrastructure' | 'support';
   url: string;
   port?: number;
-  status: 'healthy' | 'degraded' | 'unhealthy' | 'unknown';
+  status: 'healthy' | 'degraded' | 'unhealthy' | 'unknown' | 'disabled';
+  enabled: boolean;
   uptime?: number;
   lastCheck?: number;
   responseTime?: number;
@@ -56,6 +59,7 @@ const SERVICE_CONFIGS: ServiceMetrics[] = [
     url: 'https://mm.itziklerner.com/services/market-data/health',
     port: 8080,
     status: 'unknown',
+    enabled: config.services.marketData,
     detailsRoute: '/services/market-data',
   },
   {
@@ -64,6 +68,7 @@ const SERVICE_CONFIGS: ServiceMetrics[] = [
     url: 'https://mm.itziklerner.com/services/order-execution/health',
     port: 8081,
     status: 'unknown',
+    enabled: config.services.orderExecution,
   },
   {
     name: 'Strategy Engine',
@@ -71,6 +76,7 @@ const SERVICE_CONFIGS: ServiceMetrics[] = [
     url: 'https://mm.itziklerner.com/services/strategy-engine/health',
     port: 8082,
     status: 'unknown',
+    enabled: config.services.strategyEngine,
   },
   {
     name: 'Risk Manager',
@@ -78,6 +84,7 @@ const SERVICE_CONFIGS: ServiceMetrics[] = [
     url: 'https://mm.itziklerner.com/services/risk-manager/health',
     port: 8083,
     status: 'unknown',
+    enabled: config.services.riskManager,
   },
   {
     name: 'Account Monitor',
@@ -85,6 +92,7 @@ const SERVICE_CONFIGS: ServiceMetrics[] = [
     url: 'https://mm.itziklerner.com/services/api-gateway/health', // Check via gateway since no direct health endpoint
     port: 8084,
     status: 'unknown',
+    enabled: config.services.accountMonitor,
   },
   {
     name: 'Configuration Service',
@@ -92,6 +100,7 @@ const SERVICE_CONFIGS: ServiceMetrics[] = [
     url: 'https://mm.itziklerner.com/services/configuration/health',
     port: 8085,
     status: 'unknown',
+    enabled: config.services.configuration,
   },
   {
     name: 'Dashboard Server',
@@ -99,6 +108,7 @@ const SERVICE_CONFIGS: ServiceMetrics[] = [
     url: 'https://mm.itziklerner.com/services/dashboard-server/health',
     port: 8086,
     status: 'unknown',
+    enabled: config.services.dashboardServer,
   },
   {
     name: 'API Gateway',
@@ -106,6 +116,7 @@ const SERVICE_CONFIGS: ServiceMetrics[] = [
     url: 'https://mm.itziklerner.com/services/api-gateway/health',
     port: 8000,
     status: 'unknown',
+    enabled: config.services.apiGateway,
   },
   // {
   //   name: 'Auth Service',
@@ -113,6 +124,7 @@ const SERVICE_CONFIGS: ServiceMetrics[] = [
   //   url: 'https://mm.itziklerner.com/services/auth-service/health',
   //   port: 9097,
   //   status: 'unknown',
+  //   enabled: config.services.auth,
   // },
   {
     name: 'Redis',
@@ -120,6 +132,7 @@ const SERVICE_CONFIGS: ServiceMetrics[] = [
     url: 'redis://localhost:6379',
     port: 6379,
     status: 'unknown',
+    enabled: config.services.redis,
   },
   {
     name: 'PostgreSQL',
@@ -127,6 +140,7 @@ const SERVICE_CONFIGS: ServiceMetrics[] = [
     url: 'postgresql://localhost:5432',
     port: 5432,
     status: 'unknown',
+    enabled: config.services.postgres,
   },
   {
     name: 'TimescaleDB',
@@ -134,6 +148,7 @@ const SERVICE_CONFIGS: ServiceMetrics[] = [
     url: 'postgresql://localhost:5433',
     port: 5433,
     status: 'unknown',
+    enabled: config.services.timescaledb,
   },
   {
     name: 'NATS',
@@ -141,6 +156,7 @@ const SERVICE_CONFIGS: ServiceMetrics[] = [
     url: 'nats://localhost:4222',
     port: 4222,
     status: 'unknown',
+    enabled: config.services.nats,
   },
   {
     name: 'Prometheus',
@@ -148,6 +164,7 @@ const SERVICE_CONFIGS: ServiceMetrics[] = [
     url: 'https://mm.itziklerner.com/services/prometheus/-/healthy', // Prometheus uses /-/healthy endpoint
     port: 9090,
     status: 'unknown',
+    enabled: config.services.prometheus,
   },
   {
     name: 'Grafana',
@@ -155,6 +172,7 @@ const SERVICE_CONFIGS: ServiceMetrics[] = [
     url: 'https://mm.itziklerner.com/services/grafana-internal/health',
     port: 3001,
     status: 'unknown',
+    enabled: config.services.grafana,
   },
 ];
 
@@ -194,6 +212,8 @@ const getStatusColor = (status: string) => {
       return 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20';
     case 'unhealthy':
       return 'text-red-500 bg-red-500/10 border-red-500/20';
+    case 'disabled':
+      return 'text-gray-400 bg-gray-400/10 border-gray-400/20';
     default:
       return 'text-gray-500 bg-gray-500/10 border-gray-500/20';
   }
@@ -207,6 +227,8 @@ const getStatusIcon = (status: string) => {
       return AlertCircle;
     case 'unhealthy':
       return XCircle;
+    case 'disabled':
+      return MinusCircle;
     default:
       return Activity;
   }
@@ -231,6 +253,15 @@ export default function ServiceMonitor() {
   const [lastRefresh, setLastRefresh] = useState<number>(Date.now());
 
   const checkServiceHealth = useCallback(async (service: ServiceMetrics): Promise<ServiceMetrics> => {
+    // Skip health checks for disabled services
+    if (!service.enabled) {
+      return {
+        ...service,
+        status: 'disabled',
+        lastCheck: Date.now(),
+      };
+    }
+
     const startTime = Date.now();
 
     try {
@@ -296,7 +327,10 @@ export default function ServiceMonitor() {
         };
       }
     } catch (error) {
-      logger.error('ServiceMonitor', `Health check error for ${service.name}`, error);
+      // Don't log errors for disabled services
+      if (service.enabled) {
+        logger.error('ServiceMonitor', `Health check error for ${service.name}`, error);
+      }
       return {
         ...service,
         status: 'unhealthy',
@@ -308,7 +342,10 @@ export default function ServiceMonitor() {
 
   const refreshAllServices = useCallback(async () => {
     setIsRefreshing(true);
-    logger.info('ServiceMonitor', 'Refreshing all services');
+    logger.info('ServiceMonitor', 'Refreshing all services', {
+      total: services.length,
+      enabled: services.filter(s => s.enabled).length,
+    });
 
     try {
       const updatedServices = await Promise.all(
@@ -318,7 +355,9 @@ export default function ServiceMonitor() {
       setLastRefresh(Date.now());
       logger.info('ServiceMonitor', 'Services refreshed successfully', {
         total: updatedServices.length,
+        enabled: updatedServices.filter(s => s.enabled).length,
         healthy: updatedServices.filter(s => s.status === 'healthy').length,
+        disabled: updatedServices.filter(s => s.status === 'disabled').length,
       });
     } catch (error) {
       logger.error('ServiceMonitor', 'Error refreshing services', error);
@@ -341,8 +380,8 @@ export default function ServiceMonitor() {
         service.name.toLowerCase().includes(searchQuery.toLowerCase())
       )
       .sort((a, b) => {
-        // Sort by status: healthy -> degraded -> unhealthy -> unknown
-        const statusOrder = { healthy: 0, degraded: 1, unhealthy: 2, unknown: 3 };
+        // Sort by status: healthy -> degraded -> unhealthy -> disabled -> unknown
+        const statusOrder = { healthy: 0, degraded: 1, unhealthy: 2, disabled: 3, unknown: 4 };
         return statusOrder[a.status] - statusOrder[b.status];
       });
   }, [services, filterType, searchQuery]);
@@ -358,7 +397,7 @@ export default function ServiceMonitor() {
   }, [services]);
 
   const handleServiceClick = (service: ServiceMetrics) => {
-    if (service.detailsRoute) {
+    if (service.detailsRoute && service.enabled) {
       logger.info('ServiceMonitor', 'Navigating to service details', { service: service.name });
       navigate(service.detailsRoute);
     }
@@ -375,6 +414,9 @@ export default function ServiceMonitor() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{services.length}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {services.filter(s => s.enabled).length} enabled
+            </p>
           </CardContent>
         </Card>
 
@@ -460,6 +502,7 @@ export default function ServiceMonitor() {
               const Icon = getServiceIcon(service.name, service.type);
               const StatusIcon = getStatusIcon(service.status);
               const hasDetailsPage = !!service.detailsRoute;
+              const isDisabled = service.status === 'disabled';
 
               return (
                 <Card
@@ -467,7 +510,8 @@ export default function ServiceMonitor() {
                   className={cn(
                     'border-2 transition-all',
                     getStatusColor(service.status),
-                    hasDetailsPage && 'cursor-pointer hover:shadow-lg hover:scale-[1.02]'
+                    hasDetailsPage && service.enabled && 'cursor-pointer hover:shadow-lg hover:scale-[1.02]',
+                    isDisabled && 'opacity-60'
                   )}
                   onClick={() => hasDetailsPage && handleServiceClick(service)}
                 >
@@ -478,7 +522,7 @@ export default function ServiceMonitor() {
                         <div>
                           <div className="font-semibold text-sm flex items-center gap-1">
                             {service.name}
-                            {hasDetailsPage && <ChevronRight className="h-3 w-3 text-muted-foreground" />}
+                            {hasDetailsPage && service.enabled && <ChevronRight className="h-3 w-3 text-muted-foreground" />}
                           </div>
                           <div className="text-xs text-muted-foreground capitalize">
                             {service.type}
@@ -492,10 +536,21 @@ export default function ServiceMonitor() {
                   <CardContent className="space-y-3">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Status</span>
-                      <span className="font-medium capitalize">{service.status}</span>
+                      <span className={cn(
+                        'font-medium capitalize px-2 py-0.5 rounded text-xs',
+                        isDisabled && 'bg-gray-400/20 text-gray-400'
+                      )}>
+                        {service.status}
+                      </span>
                     </div>
 
-                    {service.uptime !== undefined && (
+                    {isDisabled && (
+                      <div className="text-xs text-muted-foreground italic border-t pt-2">
+                        Service disabled via environment configuration
+                      </div>
+                    )}
+
+                    {!isDisabled && service.uptime !== undefined && (
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground flex items-center gap-1">
                           <Clock className="h-3 w-3" />
@@ -505,7 +560,7 @@ export default function ServiceMonitor() {
                       </div>
                     )}
 
-                    {service.responseTime !== undefined && (
+                    {!isDisabled && service.responseTime !== undefined && (
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground flex items-center gap-1">
                           <Activity className="h-3 w-3" />
@@ -515,7 +570,7 @@ export default function ServiceMonitor() {
                       </div>
                     )}
 
-                    {service.cpu !== undefined && service.memory !== undefined && (
+                    {!isDisabled && service.cpu !== undefined && service.memory !== undefined && (
                       <div className="grid grid-cols-2 gap-2 text-sm">
                         <div className="flex items-center gap-1">
                           <Cpu className="h-3 w-3 text-muted-foreground" />
@@ -530,7 +585,7 @@ export default function ServiceMonitor() {
                       </div>
                     )}
 
-                    {service.latency && (
+                    {!isDisabled && service.latency && (
                       <div className="border-t pt-2 space-y-1">
                         <div className="text-xs text-muted-foreground">Latency Percentiles</div>
                         <div className="grid grid-cols-3 gap-2 text-xs">
@@ -550,7 +605,7 @@ export default function ServiceMonitor() {
                       </div>
                     )}
 
-                    {service.errorRate !== undefined && (
+                    {!isDisabled && service.errorRate !== undefined && (
                       <div className="flex items-center justify-between text-sm border-t pt-2">
                         <span className="text-muted-foreground">Error Rate</span>
                         <span className={cn(
@@ -563,13 +618,13 @@ export default function ServiceMonitor() {
                       </div>
                     )}
 
-                    {service.lastCheck && (
+                    {!isDisabled && service.lastCheck && (
                       <div className="text-xs text-muted-foreground border-t pt-2">
                         Last check: {new Date(service.lastCheck).toLocaleTimeString()}
                       </div>
                     )}
 
-                    {hasDetailsPage && (
+                    {hasDetailsPage && service.enabled && (
                       <div className="border-t pt-2">
                         <div className="text-xs text-muted-foreground flex items-center gap-1">
                           Click for detailed monitoring
