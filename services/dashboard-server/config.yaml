@@ -36,7 +36,7 @@ backend_services:
     url: localhost:8081
     timeout: 5s
   account_monitor:
-    url: localhost:8084
+    url: localhost:50054
     timeout: 5s
   strategy_engine:
     url: localhost:8082

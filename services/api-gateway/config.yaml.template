@@ -1,0 +1,253 @@
+# API Gateway Configuration Example
+# Copy this file to config.yaml and update with your settings
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  mode: "release" # debug, release, test
+  read_timeout: 10s
+  write_timeout: 10s
+  idle_timeout: 120s
+  max_header_bytes: 1048576 # 1MB
+
+# Service endpoints
+services:
+  market_data:
+    url: "http://market-data:9090"
+    timeout: 5s
+    max_retries: 3
+
+  order_execution:
+    url: "http://order-execution:9091"
+    timeout: 10s
+    max_retries: 2
+
+  strategy_engine:
+    url: "http://strategy-engine:9092"
+    timeout: 5s
+    max_retries: 2
+
+  account_monitor:
+    url: "http://account-monitor:9093"
+    timeout: 5s
+    max_retries: 3
+
+  dashboard_server:
+    url: "http://dashboard-server:8080"
+    timeout: 5s
+    max_retries: 3
+
+  risk_manager:
+    url: "http://risk-manager:9095"
+    timeout: 5s
+    max_retries: 2
+
+  configuration:
+    url: "http://configuration:9096"
+    timeout: 5s
+    max_retries: 3
+
+# Authentication
+auth:
+  enabled: true
+  jwt_secret: "your-super-secret-jwt-key-change-this-in-production"
+  jwt_expiry: 24h
+  refresh_token_expiry: 168h # 7 days
+
+  # API keys for service-to-service communication
+  api_keys:
+    - key: "admin-key-change-this"
+      role: "admin"
+    - key: "operator-key-change-this"
+      role: "operator"
+    - key: "viewer-key-change-this"
+      role: "viewer"
+
+# Rate limiting
+rate_limit:
+  enabled: true
+
+  # Global rate limits
+  global:
+    requests_per_second: 1000
+    burst: 2000
+
+  # Per-endpoint rate limits
+  endpoints:
+    "/api/v1/orders":
+      requests_per_second: 10
+      burst: 20
+    "/api/v1/market-data":
+      requests_per_second: 100
+      burst: 200
+    "/api/v1/account":
+      requests_per_second: 50
+      burst: 100
+
+  # Per-IP rate limits
+  per_ip:
+    requests_per_minute: 300
+    burst: 500
+
+# CORS configuration
+cors:
+  enabled: true
+  allowed_origins:
+    - "http://localhost:3000"
+    - "http://localhost:5173"
+    - "https://trading.example.com"
+  allowed_methods:
+    - "GET"
+    - "POST"
+    - "PUT"
+    - "DELETE"
+    - "OPTIONS"
+  allowed_headers:
+    - "Origin"
+    - "Content-Type"
+    - "Authorization"
+    - "X-Request-ID"
+  expose_headers:
+    - "X-Request-ID"
+    - "X-RateLimit-Limit"
+    - "X-RateLimit-Remaining"
+  allow_credentials: true
+  max_age: 3600
+
+# Circuit breaker
+circuit_breaker:
+  enabled: true
+  max_requests: 3
+  interval: 10s
+  timeout: 60s
+
+  # Per-service circuit breaker settings
+  services:
+    order_execution:
+      max_requests: 5
+      interval: 30s
+      timeout: 120s
+
+# Caching
+cache:
+  enabled: true
+  redis_url: "redis://localhost:6379/0"
+  default_ttl: 60s
+
+  # Cache rules per endpoint
+  rules:
+    "/api/v1/market-data/symbols":
+      ttl: 300s # 5 minutes
+    "/api/v1/account/balance":
+      ttl: 5s
+    "/api/v1/strategies":
+      ttl: 60s
+
+# Load balancing
+load_balancing:
+  enabled: false
+  algorithm: "round_robin" # round_robin, least_connections, random
+  health_check_interval: 10s
+
+# Request validation
+validation:
+  enabled: true
+  max_request_size: 10485760 # 10MB
+
+  # JSON schema validation per endpoint
+  schemas:
+    "/api/v1/orders": "/schemas/order_request.schema.json"
+
+# Logging
+logging:
+  level: "info" # debug, info, warn, error
+  format: "json" # json, console
+  output: "stdout" # stdout, file
+  file_path: "/var/log/api-gateway/gateway.log"
+  max_size: 100 # MB
+  max_age: 30 # days
+  max_backups: 10
+  compress: true
+
+# Metrics
+metrics:
+  enabled: true
+  path: "/metrics"
+  namespace: "api_gateway"
+
+# Health checks
+health:
+  enabled: true
+  path: "/health"
+  check_services: true
+  service_timeout: 2s
+
+# API versioning
+versioning:
+  default_version: "v1"
+  supported_versions:
+    - "v1"
+  header_name: "X-API-Version"
+
+# TLS/SSL
+tls:
+  enabled: false
+  cert_file: "/etc/ssl/certs/gateway.crt"
+  key_file: "/etc/ssl/private/gateway.key"
+  min_version: "1.2"
+
+# Request/Response transformation
+transformation:
+  enabled: true
+
+  # Add custom headers to upstream requests
+  request_headers:
+    "X-Gateway-Version": "1.0.0"
+    "X-Forwarded-For": "${client_ip}"
+
+  # Remove headers from responses
+  response_headers_remove:
+    - "X-Powered-By"
+    - "Server"
+
+# WebSocket configuration
+websocket:
+  enabled: true
+  max_connections: 1000
+  read_buffer_size: 1024
+  write_buffer_size: 1024
+  handshake_timeout: 10s
+  ping_interval: 30s
+  pong_timeout: 60s
+
+# Retry policy
+retry:
+  enabled: true
+  max_attempts: 3
+  backoff_multiplier: 2
+  initial_interval: 100ms
+  max_interval: 5s
+
+  # Retryable status codes
+  retryable_status_codes:
+    - 502
+    - 503
+    - 504
+
+# Request timeout
+timeout:
+  default: 30s
+  max: 300s
+
+  # Per-endpoint timeouts
+  endpoints:
+    "/api/v1/orders": 10s
+    "/api/v1/backtest": 300s
+
+# Feature flags
+features:
+  enable_tracing: true
+  enable_compression: true
+  enable_request_id: true
+  enable_access_log: true
+  enable_error_details: false # Don't expose internal errors in production

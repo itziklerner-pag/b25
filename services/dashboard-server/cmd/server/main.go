@@ -14,6 +14,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 
+	"github.com/yourusername/b25/services/dashboard-server/internal/admin"
 	"github.com/yourusername/b25/services/dashboard-server/internal/aggregator"
 	"github.com/yourusername/b25/services/dashboard-server/internal/broadcaster"
 	"github.com/yourusername/b25/services/dashboard-server/internal/server"
@@ -68,8 +69,18 @@ func main() {
 	}
 	wsServer := server.NewServer(logger, stateAggregator, broadcaster, serverConfig)
 
+	// Create admin handler
+	adminHandler := admin.NewHandler(logger, stateAggregator, wsServer)
+
 	// Setup HTTP routes
 	mux := http.NewServeMux()
+
+	// Admin routes
+	mux.HandleFunc("/", adminHandler.HandleAdminPage)
+	mux.HandleFunc("/admin", adminHandler.HandleAdminPage)
+	mux.HandleFunc("/api/service-info", adminHandler.HandleServiceInfo)
+
+	// WebSocket and API routes
 	mux.HandleFunc("/ws", wsServer.HandleWebSocket)
 	mux.HandleFunc("/health", handleHealth)
 	mux.HandleFunc("/debug", wsServer.HandleDebug)
@@ -179,7 +190,7 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status":"ok","service":"dashboard-server"}`))
+	w.Write([]byte(`{"status":"healthy","service":"dashboard-server"}`))
 }
 
 func loggingMiddleware(logger zerolog.Logger, next http.Handler) http.Handler {

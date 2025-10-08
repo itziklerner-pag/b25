@@ -47,6 +47,11 @@ func (v *Validator) RegisterSymbol(info *SymbolInfo) {
 	v.symbolInfo[info.Symbol] = info
 }
 
+// GetRiskLimits returns the current risk limits
+func (v *Validator) GetRiskLimits() *RiskLimits {
+	return v.riskLimits
+}
+
 // ValidateOrder validates an order against all rules
 func (v *Validator) ValidateOrder(order *models.Order) error {
 	// Check symbol is registered

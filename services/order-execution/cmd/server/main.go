@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/reflection"
 	"gopkg.in/yaml.v3"
 
+	"github.com/yourusername/b25/services/order-execution/internal/admin"
 	"github.com/yourusername/b25/services/order-execution/internal/executor"
 	"github.com/yourusername/b25/services/order-execution/internal/health"
 	pb "github.com/yourusername/b25/services/order-execution/proto"
@@ -70,6 +71,9 @@ func main() {
 
 	logger.Info("starting order execution service", zap.String("version", version))
 
+	// Set version in admin package
+	admin.SetVersion(version)
+
 	// Load configuration
 	cfg, err := loadConfig("config.yaml")
 	if err != nil {
@@ -104,7 +108,7 @@ func main() {
 	// Start gRPC server
 	grpcServer := startGRPCServer(cfg, orderExecutor, logger)
 
-	// Start HTTP server (health + metrics)
+	// Start HTTP server (health + metrics + admin)
 	httpServer := startHTTPServer(cfg, orderExecutor, logger)
 
 	// Wait for shutdown signal
@@ -245,7 +249,7 @@ func startGRPCServer(cfg *Config, orderExecutor *executor.OrderExecutor, logger 
 	return grpcServer
 }
 
-// startHTTPServer starts the HTTP server for health checks and metrics
+// startHTTPServer starts the HTTP server for health checks, metrics, and admin
 func startHTTPServer(cfg *Config, orderExecutor *executor.OrderExecutor, logger *zap.Logger) *http.Server {
 	mux := http.NewServeMux()
 
@@ -256,7 +260,21 @@ func startHTTPServer(cfg *Config, orderExecutor *executor.OrderExecutor, logger 
 		version,
 	)
 
+	// Create admin handler
+	adminConfig := &admin.Config{
+		HTTPPort:       cfg.Server.HTTPPort,
+		GRPCPort:       cfg.Server.GRPCPort,
+		TestnetMode:    cfg.Exchange.Testnet,
+		RateLimitRPS:   cfg.RateLimit.RequestsPerSecond,
+		RateLimitBurst: cfg.RateLimit.Burst,
+	}
+	adminHandler := admin.NewHandler(orderExecutor, logger, adminConfig)
+
 	// Register endpoints
+	mux.HandleFunc("/", adminHandler.AdminPageHandler()) // Show admin page by default
+	mux.HandleFunc("/admin", adminHandler.AdminPageHandler())
+	mux.HandleFunc("/api/service-info", adminHandler.ServiceInfoHandler())
+	mux.HandleFunc("/api/endpoints", adminHandler.EndpointsHandler())
 	mux.HandleFunc("/health", healthChecker.HTTPHandler())
 	mux.HandleFunc("/health/ready", healthChecker.ReadinessHandler())
 	mux.HandleFunc("/health/live", healthChecker.LivenessHandler())
@@ -279,6 +297,14 @@ func startHTTPServer(cfg *Config, orderExecutor *executor.OrderExecutor, logger 
 	}()
 
 	return server
+}
+
+// rootHandler returns a simple service info handler for root path
+func rootHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, `{"service":"Order Execution Service","version":"%s","status":"running"}`, version)
+	}
 }
 
 // waitForShutdown waits for shutdown signal and performs graceful shutdown

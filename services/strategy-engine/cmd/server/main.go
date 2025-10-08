@@ -122,6 +122,11 @@ func authMiddleware(cfg *config.Config, next http.HandlerFunc) http.HandlerFunc 
 func startHTTPServer(cfg *config.Config, log *logger.Logger, eng *engine.Engine) *http.Server {
 	mux := http.NewServeMux()
 
+	// Admin page routes (no auth required for viewing the dashboard)
+	mux.HandleFunc("/", handleAdminPage)
+	mux.HandleFunc("/admin", handleAdminPage)
+	mux.HandleFunc("/api/service-info", handleServiceInfo(cfg, eng))
+
 	// Health check endpoint
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		// Set CORS headers

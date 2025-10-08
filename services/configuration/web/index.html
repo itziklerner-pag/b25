@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuration Service - Admin Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #2563eb;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --surface: #ffffff;
+            --surface-dark: #f9fafb;
+            --border: #e5e7eb;
+            --text: #111827;
+            --text-secondary: #6b7280;
+            --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 24px;
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: var(--surface);
+            border-radius: 16px;
+            padding: 32px;
+            margin-bottom: 24px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        h1 {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .service-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: var(--primary);
+            color: white;
+            border-radius: 24px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 16px;
+            margin-top: 8px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .card {
+            background: var(--surface);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: var(--shadow-lg);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .card-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .icon-primary { background: rgba(59, 130, 246, 0.1); }
+        .icon-success { background: rgba(16, 185, 129, 0.1); }
+        .icon-warning { background: rgba(245, 158, 11, 0.1); }
+        .icon-info { background: rgba(99, 102, 241, 0.1); }
+
+        .card-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .card-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--text);
+            margin: 8px 0;
+        }
+
+        .card-description {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .stat-item {
+            padding: 12px;
+            background: var(--surface-dark);
+            border-radius: 8px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .endpoint-list {
+            list-style: none;
+        }
+
+        .endpoint-item {
+            padding: 12px;
+            background: var(--surface-dark);
+            border-radius: 8px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: background 0.2s;
+        }
+
+        .endpoint-item:hover {
+            background: #f3f4f6;
+        }
+
+        .endpoint-method {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+        }
+
+        .method-get { background: rgba(16, 185, 129, 0.1); color: var(--success); }
+        .method-post { background: rgba(59, 130, 246, 0.1); color: var(--primary); }
+        .method-put { background: rgba(245, 158, 11, 0.1); color: var(--warning); }
+        .method-delete { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
+
+        .endpoint-path {
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            color: var(--text);
+            flex: 1;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .health-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .status-healthy {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+
+        .status-unhealthy {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+        }
+
+        .status-loading {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning);
+        }
+
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: currentColor;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .config-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+        }
+
+        .config-table th {
+            text-align: left;
+            padding: 12px;
+            background: var(--surface-dark);
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-secondary);
+            border-bottom: 2px solid var(--border);
+        }
+
+        .config-table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+        }
+
+        .config-table tr:hover {
+            background: var(--surface-dark);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge-active {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+
+        .badge-inactive {
+            background: rgba(107, 114, 128, 0.1);
+            color: var(--text-secondary);
+        }
+
+        .code-block {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 16px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            margin-top: 12px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 48px 24px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 16px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .header {
+                padding: 24px;
+            }
+
+            .card-value {
+                font-size: 24px;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-top">
+                <div>
+                    <h1>
+                        <span>⚙️</span>
+                        Configuration Service
+                    </h1>
+                    <p class="subtitle">Centralized configuration management for B25 trading platform</p>
+                </div>
+                <div class="service-badge">
+                    <span class="status-indicator"></span>
+                    <span>PORT 8085</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon icon-success">💚</div>
+                    <div>
+                        <div class="card-title">Service Health</div>
+                    </div>
+                </div>
+                <div id="health-status" class="health-status status-loading">
+                    <span class="loading"></span>
+                    <span>Checking health...</span>
+                </div>
+                <div class="stats-grid" id="health-details" style="display: none;">
+                    <div class="stat-item">
+                        <div class="stat-label">Database</div>
+                        <div class="stat-value" id="db-status">-</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">NATS</div>
+                        <div class="stat-value" id="nats-status">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon icon-primary">📊</div>
+                    <div>
+                        <div class="card-title">Configurations</div>
+                    </div>
+                </div>
+                <div class="card-value" id="config-count">0</div>
+                <div class="card-description">Total configurations stored</div>
+                <button class="btn btn-primary" onclick="loadConfigurations()" style="margin-top: 16px; width: 100%;">
+                    View All Configs
+                </button>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon icon-warning">🔧</div>
+                    <div>
+                        <div class="card-title">Service Info</div>
+                    </div>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-label">Version</div>
+                        <div class="stat-value">1.0.0</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Uptime</div>
+                        <div class="stat-value" id="uptime">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon icon-info">🔗</div>
+                    <div>
+                        <div class="card-title">Quick Links</div>
+                    </div>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <button class="btn btn-primary" onclick="window.open('/health', '_blank')">
+                        Health Check
+                    </button>
+                    <button class="btn btn-primary" onclick="window.open('/ready', '_blank')">
+                        Readiness Check
+                    </button>
+                    <button class="btn btn-primary" onclick="window.open('/metrics', '_blank')">
+                        Metrics
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <div class="card-icon icon-primary">🌐</div>
+                <div>
+                    <div class="card-title">API Endpoints</div>
+                </div>
+            </div>
+            <ul class="endpoint-list">
+                <li class="endpoint-item">
+                    <span class="endpoint-method method-get">GET</span>
+                    <span class="endpoint-path">/health</span>
+                </li>
+                <li class="endpoint-item">
+                    <span class="endpoint-method method-get">GET</span>
+                    <span class="endpoint-path">/ready</span>
+                </li>
+                <li class="endpoint-item">
+                    <span class="endpoint-method method-get">GET</span>
+                    <span class="endpoint-path">/metrics</span>
+                </li>
+                <li class="endpoint-item">
+                    <span class="endpoint-method method-post">POST</span>
+                    <span class="endpoint-path">/api/v1/configurations</span>
+                </li>
+                <li class="endpoint-item">
+                    <span class="endpoint-method method-get">GET</span>
+                    <span class="endpoint-path">/api/v1/configurations</span>
+                </li>
+                <li class="endpoint-item">
+                    <span class="endpoint-method method-get">GET</span>
+                    <span class="endpoint-path">/api/v1/configurations/:id</span>
+                </li>
+                <li class="endpoint-item">
+                    <span class="endpoint-method method-get">GET</span>
+                    <span class="endpoint-path">/api/v1/configurations/key/:key</span>
+                </li>
+                <li class="endpoint-item">
+                    <span class="endpoint-method method-put">PUT</span>
+                    <span class="endpoint-path">/api/v1/configurations/:id</span>
+                </li>
+                <li class="endpoint-item">
+                    <span class="endpoint-method method-post">POST</span>
+                    <span class="endpoint-path">/api/v1/configurations/:id/activate</span>
+                </li>
+                <li class="endpoint-item">
+                    <span class="endpoint-method method-post">POST</span>
+                    <span class="endpoint-path">/api/v1/configurations/:id/deactivate</span>
+                </li>
+                <li class="endpoint-item">
+                    <span class="endpoint-method method-delete">DELETE</span>
+                    <span class="endpoint-path">/api/v1/configurations/:id</span>
+                </li>
+                <li class="endpoint-item">
+                    <span class="endpoint-method method-get">GET</span>
+                    <span class="endpoint-path">/api/v1/configurations/:id/versions</span>
+                </li>
+                <li class="endpoint-item">
+                    <span class="endpoint-method method-post">POST</span>
+                    <span class="endpoint-path">/api/v1/configurations/:id/rollback</span>
+                </li>
+                <li class="endpoint-item">
+                    <span class="endpoint-method method-get">GET</span>
+                    <span class="endpoint-path">/api/v1/configurations/:id/audit-logs</span>
+                </li>
+            </ul>
+        </div>
+
+        <div class="card" id="configs-section" style="display: none;">
+            <div class="card-header">
+                <div class="card-icon icon-primary">📝</div>
+                <div>
+                    <div class="card-title">Configurations</div>
+                </div>
+            </div>
+            <div id="configs-content"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin + '/services/configuration';
+        let startTime = Date.now();
+
+        // Update uptime every second
+        setInterval(() => {
+            const uptime = Math.floor((Date.now() - startTime) / 1000);
+            const hours = Math.floor(uptime / 3600);
+            const minutes = Math.floor((uptime % 3600) / 60);
+            const seconds = uptime % 60;
+            document.getElementById('uptime').textContent =
+                `${hours}h ${minutes}m ${seconds}s`;
+        }, 1000);
+
+        // Check health on load
+        async function checkHealth() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+
+                const statusEl = document.getElementById('health-status');
+                const detailsEl = document.getElementById('health-details');
+
+                if (data.status === 'healthy') {
+                    statusEl.className = 'health-status status-healthy';
+                    statusEl.innerHTML = '<span>✓</span><span>Service Healthy</span>';
+                } else {
+                    statusEl.className = 'health-status status-unhealthy';
+                    statusEl.innerHTML = '<span>✗</span><span>Service Unhealthy</span>';
+                }
+
+                // Check readiness for detailed status
+                const readyResponse = await fetch(`${API_BASE}/ready`);
+                const readyData = await readyResponse.json();
+
+                if (readyData.checks) {
+                    detailsEl.style.display = 'grid';
+                    document.getElementById('db-status').textContent =
+                        readyData.checks.database || 'OK';
+                    document.getElementById('nats-status').textContent =
+                        readyData.checks.nats || 'OK';
+                }
+            } catch (error) {
+                const statusEl = document.getElementById('health-status');
+                statusEl.className = 'health-status status-unhealthy';
+                statusEl.innerHTML = '<span>✗</span><span>Connection Failed</span>';
+                console.error('Health check failed:', error);
+            }
+        }
+
+        // Load configurations count
+        async function loadConfigCount() {
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/configurations`);
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('config-count').textContent = data.total || 0;
+                }
+            } catch (error) {
+                console.error('Failed to load config count:', error);
+            }
+        }
+
+        // Load and display configurations
+        async function loadConfigurations() {
+            const section = document.getElementById('configs-section');
+            const content = document.getElementById('configs-content');
+
+            section.style.display = 'block';
+            content.innerHTML = '<div class="empty-state"><div class="loading"></div><p>Loading configurations...</p></div>';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/configurations`);
+                const data = await response.json();
+
+                if (data.success && data.data && data.data.length > 0) {
+                    let html = '<table class="config-table"><thead><tr>';
+                    html += '<th>Key</th><th>Service</th><th>Version</th><th>Status</th><th>Updated</th>';
+                    html += '</tr></thead><tbody>';
+
+                    data.data.forEach(config => {
+                        const statusBadge = config.is_active
+                            ? '<span class="badge badge-active">Active</span>'
+                            : '<span class="badge badge-inactive">Inactive</span>';
+
+                        const date = new Date(config.updated_at).toLocaleString();
+
+                        html += `<tr>
+                            <td><strong>${config.key}</strong></td>
+                            <td>${config.service_name || '-'}</td>
+                            <td>${config.version}</td>
+                            <td>${statusBadge}</td>
+                            <td>${date}</td>
+                        </tr>`;
+                    });
+
+                    html += '</tbody></table>';
+                    content.innerHTML = html;
+                } else {
+                    content.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📋</div>
+                            <h3>No Configurations Found</h3>
+                            <p>No configurations have been created yet.</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                content.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⚠️</div>
+                        <h3>Failed to Load</h3>
+                        <p>Error: ${error.message}</p>
+                    </div>
+                `;
+                console.error('Failed to load configurations:', error);
+            }
+        }
+
+        // Initialize dashboard
+        window.addEventListener('load', () => {
+            checkHealth();
+            loadConfigCount();
+
+            // Refresh health every 30 seconds
+            setInterval(checkHealth, 30000);
+            setInterval(loadConfigCount, 30000);
+        });
+    </script>
+</body>
+</html>

@@ -66,17 +66,19 @@ const SERVICE_CONFIGS: ServiceMetrics[] = [
     name: 'Order Execution Service',
     type: 'trading',
     url: 'https://mm.itziklerner.com/services/order-execution/health',
-    port: 8081,
+    port: 9091,
     status: 'unknown',
     enabled: config.services.orderExecution,
+    detailsRoute: '/services/order-execution',
   },
   {
     name: 'Strategy Engine',
     type: 'trading',
     url: 'https://mm.itziklerner.com/services/strategy-engine/health',
-    port: 8082,
+    port: 9092,
     status: 'unknown',
     enabled: config.services.strategyEngine,
+    detailsRoute: '/services/strategy-engine',
   },
   {
     name: 'Risk Manager',
@@ -89,10 +91,11 @@ const SERVICE_CONFIGS: ServiceMetrics[] = [
   {
     name: 'Account Monitor',
     type: 'trading',
-    url: 'https://mm.itziklerner.com/services/api-gateway/health', // Check via gateway since no direct health endpoint
-    port: 8084,
+    url: 'https://mm.itziklerner.com/services/account-monitor/health',
+    port: 8087,
     status: 'unknown',
     enabled: config.services.accountMonitor,
+    detailsRoute: '/services/account-monitor',
   },
   {
     name: 'Configuration Service',
@@ -109,6 +112,7 @@ const SERVICE_CONFIGS: ServiceMetrics[] = [
     port: 8086,
     status: 'unknown',
     enabled: config.services.dashboardServer,
+    detailsRoute: '/services/dashboard-server',
   },
   {
     name: 'API Gateway',
@@ -117,6 +121,7 @@ const SERVICE_CONFIGS: ServiceMetrics[] = [
     port: 8000,
     status: 'unknown',
     enabled: config.services.apiGateway,
+    detailsRoute: '/services/api-gateway',
   },
   // {
   //   name: 'Auth Service',

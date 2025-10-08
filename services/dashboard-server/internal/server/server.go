@@ -71,6 +71,13 @@ func NewServer(logger zerolog.Logger, aggregator *aggregator.Aggregator, broadca
 	return s
 }
 
+// GetClientCount returns the current number of connected clients
+func (s *Server) GetClientCount() int {
+	s.clientsMu.RLock()
+	defer s.clientsMu.RUnlock()
+	return len(s.clients)
+}
+
 // checkOrigin validates the Origin header against allowed origins
 func (s *Server) checkOrigin(r *http.Request) bool {
 	origin := r.Header.Get("Origin")

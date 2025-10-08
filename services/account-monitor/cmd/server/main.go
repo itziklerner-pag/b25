@@ -199,6 +199,11 @@ func startHTTPServer(cfg *config.Config, healthChecker *health.Checker, monitor 
 	mux.HandleFunc("/health", healthChecker.HandleHealth)
 	mux.HandleFunc("/ready", healthChecker.HandleReady)
 
+	// Admin page
+	mux.HandleFunc("/admin", monitor.HandleAdminPage)
+	mux.HandleFunc("/", monitor.HandleAdminPage) // Default to admin page
+	mux.HandleFunc("/api/service-info", monitor.HandleServiceInfo)
+
 	// Dashboard API endpoints
 	if cfg.HTTP.DashboardEnabled {
 		mux.HandleFunc("/api/account", monitor.HandleAccountState)

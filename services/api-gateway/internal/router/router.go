@@ -1,6 +1,7 @@
 package router
 
 import (
+	"github.com/b25/api-gateway/internal/admin"
 	"github.com/b25/api-gateway/internal/breaker"
 	"github.com/b25/api-gateway/internal/cache"
 	"github.com/b25/api-gateway/internal/config"
@@ -49,6 +50,7 @@ func New(cfg *config.Config, log *logger.Logger, m *metrics.Collector) (*Router,
 	healthHandler := handlers.NewHealthHandler(cfg, log, breakerMgr)
 	metricsHandler := handlers.NewMetricsHandler()
 	versionHandler := handlers.NewVersionHandler("1.0.0", "", "")
+	adminHandler := admin.NewHandler(cfg, log)
 
 	// Global middleware
 	engine.Use(loggingMw.Recovery())
@@ -71,6 +73,11 @@ func New(cfg *config.Config, log *logger.Logger, m *metrics.Collector) (*Router,
 		engine.Use(rateLimitMw.EndpointLimit())
 		engine.Use(rateLimitMw.RateLimitHeaders())
 	}
+
+	// Admin routes (public for internal access)
+	engine.GET("/admin", gin.WrapF(adminHandler.HandleAdminPage))
+	engine.GET("/", gin.WrapF(adminHandler.HandleAdminPage)) // Default to admin page
+	engine.GET("/api/service-info", gin.WrapF(adminHandler.HandleServiceInfo))
 
 	// Public routes (no auth required)
 	public := engine.Group("/")

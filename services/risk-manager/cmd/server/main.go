@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -32,6 +33,11 @@ import (
 	"google.golang.org/grpc/keepalive"
 )
 
+var (
+	startTime = time.Now()
+	appConfig *config.Config
+)
+
 func main() {
 	// Load configuration
 	cfg, err := config.Load("")
@@ -39,6 +45,7 @@ func main() {
 		fmt.Printf("Failed to load config: %v\n", err)
 		os.Exit(1)
 	}
+	appConfig = cfg
 
 	// Initialize logger
 	logger, err := initLogger(cfg.Logging)
@@ -318,21 +325,55 @@ func setCORSHeaders(w http.ResponseWriter) {
 
 func startMetricsServer(cfg *config.Config, logger *zap.Logger) {
 	mux := http.NewServeMux()
+
+	// Prometheus metrics
 	mux.Handle("/metrics", promhttp.Handler())
 
 	// Health check endpoint
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		// Set CORS headers
 		setCORSHeaders(w)
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
 
-		// Handle OPTIONS preflight request
+	// Service info endpoint
+	mux.HandleFunc("/api/service-info", func(w http.ResponseWriter, r *http.Request) {
+		setCORSHeaders(w)
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
 
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		info := map[string]interface{}{
+			"name":        "Risk Manager Service",
+			"version":     "1.0.0",
+			"port":        cfg.Server.Port,
+			"grpc_port":   cfg.GRPC.Port,
+			"environment": cfg.Server.Mode,
+			"start_time":  startTime.Format(time.RFC3339),
+			"uptime":      time.Since(startTime).String(),
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(info)
+	})
+
+	// Admin page - root
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+			return
+		}
+		http.ServeFile(w, r, "admin/index.html")
+	})
+
+	// Admin page - explicit /admin path
+	mux.HandleFunc("/admin", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "admin/index.html")
 	})
 
 	srv := &http.Server{

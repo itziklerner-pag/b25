@@ -166,6 +166,7 @@ func (r *Reconciler) reconcileBalances(exchangeBalances map[string]ExchangeBalan
 	drifts := []BalanceDrift{}
 	localBalances := r.balanceMgr.GetAllBalances()
 
+	// Check existing local balances for drifts
 	for asset, localBal := range localBalances {
 		exchangeBal, exists := exchangeBalances[asset]
 		if !exists {
@@ -191,6 +192,20 @@ func (r *Reconciler) reconcileBalances(exchangeBalances map[string]ExchangeBalan
 		}
 	}
 
+	// Check for exchange balances that don't exist locally (initialization)
+	for asset, exchangeBal := range exchangeBalances {
+		if _, exists := localBalances[asset]; !exists && !exchangeBal.Total.IsZero() {
+			// Treat missing local balance as a drift that needs correction
+			drifts = append(drifts, BalanceDrift{
+				Asset:           asset,
+				LocalBalance:    decimal.Zero,
+				ExchangeBalance: exchangeBal.Total,
+				Drift:           exchangeBal.Total,
+				DriftPercent:    decimal.NewFromInt(100),
+			})
+		}
+	}
+
 	return drifts
 }
 
@@ -199,6 +214,7 @@ func (r *Reconciler) reconcilePositions(exchangePositions map[string]ExchangePos
 	drifts := []PositionDrift{}
 	localPositions := r.positionMgr.GetAllPositions()
 
+	// Check existing local positions for drifts
 	for symbol, localPos := range localPositions {
 		exchangePos, exists := exchangePositions[symbol]
 		if !exists {
@@ -221,6 +237,20 @@ func (r *Reconciler) reconcilePositions(exchangePositions map[string]ExchangePos
 			})
 
 			metrics.ReconciliationDrift.Observe(drift.Abs().InexactFloat64())
+		}
+	}
+
+	// Check for exchange positions that don't exist locally (initialization)
+	for symbol, exchangePos := range exchangePositions {
+		if _, exists := localPositions[symbol]; !exists && !exchangePos.Quantity.IsZero() {
+			// Treat missing local position as a drift that needs correction
+			drifts = append(drifts, PositionDrift{
+				Symbol:           symbol,
+				LocalQuantity:    decimal.Zero,
+				ExchangeQuantity: exchangePos.Quantity,
+				Drift:            exchangePos.Quantity,
+				DriftPercent:     decimal.NewFromInt(100),
+			})
 		}
 	}
 

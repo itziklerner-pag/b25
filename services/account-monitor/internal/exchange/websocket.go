@@ -105,20 +105,20 @@ func (w *WebSocketClient) connect(ctx context.Context) error {
 	}
 	w.listenKey = listenKey
 
-	// Connect to WebSocket
-	wsURL := "wss://stream.binance.com:9443/ws/" + listenKey
+	// Connect to Futures WebSocket user data stream
+	wsURL := "wss://fstream.binance.com/ws/" + listenKey
 	if w.config.Testnet {
-		wsURL = "wss://testnet.binance.vision/ws/" + listenKey
+		wsURL = "wss://stream.binancefuture.com/ws/" + listenKey
 	}
 
 	conn, _, err := websocket.DefaultDialer.DialContext(ctx, wsURL, nil)
 	if err != nil {
-		return fmt.Errorf("failed to dial WebSocket: %w", err)
+		return fmt.Errorf("failed to dial Futures WebSocket: %w", err)
 	}
 
 	w.conn = conn
 	w.connected = true
-	w.logger.Info("WebSocket connected", zap.String("url", wsURL))
+	w.logger.Info("Futures WebSocket connected", zap.String("url", wsURL))
 
 	return nil
 }
